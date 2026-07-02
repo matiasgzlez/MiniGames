@@ -1,0 +1,505 @@
+:root {
+  color-scheme: dark;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #0a0d16;
+  font-family: "Consolas", "Courier New", monospace;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+#app {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+}
+
+canvas {
+  display: block;
+}
+
+.back-link {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 30;
+  font-size: 13px;
+  letter-spacing: 2px;
+  color: #9fc0ff;
+  text-decoration: none;
+  text-shadow: 0 0 8px #3ba7ff;
+  opacity: 0.75;
+}
+.back-link:hover {
+  opacity: 1;
+}
+
+/* Marcador y reloj */
+.scoreboard {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 38px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  background: rgba(8, 11, 20, 0.55);
+  padding: 6px 22px;
+  border-radius: 14px;
+  backdrop-filter: blur(6px);
+}
+.score-blue {
+  color: #3ba7ff;
+  text-shadow: 0 0 12px #3ba7ff;
+}
+.score-orange {
+  color: #ff8a3d;
+  text-shadow: 0 0 12px #ff8a3d;
+}
+.score-sep {
+  color: #5b6172;
+}
+.score-time {
+  position: absolute;
+  top: 66px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  font-size: 20px;
+  letter-spacing: 3px;
+  color: #c7cede;
+  opacity: 0.85;
+}
+
+.match-note {
+  position: absolute;
+  top: 94px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  opacity: 0;
+}
+.match-note.is-shown {
+  opacity: 0.9;
+}
+.match-note.blue {
+  color: #3ba7ff;
+  text-shadow: 0 0 10px #3ba7ff;
+}
+.match-note.orange {
+  color: #ff8a3d;
+  text-shadow: 0 0 10px #ff8a3d;
+}
+
+/* Overlay de inicio / resultado */
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: rgba(6, 9, 16, 0.72);
+  backdrop-filter: blur(4px);
+  transition: opacity 0.25s;
+}
+.overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+.overlay__title {
+  font-size: 52px;
+  font-weight: 800;
+  letter-spacing: 4px;
+  color: #fff;
+  text-shadow: 0 0 24px #3ba7ff;
+}
+.overlay__subtitle {
+  font-size: 18px;
+  color: #aab2c5;
+  letter-spacing: 1px;
+}
+.overlay__actions {
+  display: flex;
+  gap: 14px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.overlay__btn {
+  font-family: inherit;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  padding: 14px 26px;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  color: #05070c;
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.2s;
+}
+.overlay__btn:hover {
+  transform: translateY(-2px);
+}
+.diff-easy {
+  background: #5ce1a6;
+  box-shadow: 0 0 18px rgba(92, 225, 166, 0.5);
+}
+.diff-medium {
+  background: #ffcf3d;
+  box-shadow: 0 0 18px rgba(255, 207, 61, 0.5);
+}
+.diff-hard {
+  background: #ff5a6a;
+  box-shadow: 0 0 18px rgba(255, 90, 106, 0.5);
+}
+
+/* Flash de gol */
+.goal-flash {
+  position: absolute;
+  top: 32%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.6);
+  z-index: 35;
+  font-size: 84px;
+  font-weight: 900;
+  letter-spacing: 6px;
+  opacity: 0;
+  pointer-events: none;
+}
+.goal-flash.is-shown {
+  animation: goal-pop 1.6s ease-out;
+}
+.goal-flash.blue {
+  color: #3ba7ff;
+  text-shadow: 0 0 30px #3ba7ff;
+}
+.goal-flash.orange {
+  color: #ff8a3d;
+  text-shadow: 0 0 30px #ff8a3d;
+}
+@keyframes goal-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.4);
+  }
+  20% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.1);
+  }
+  80% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+/* Cuenta regresiva del saque */
+.countdown {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.5);
+  z-index: 36;
+  font-size: 120px;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 0 30px #3ba7ff;
+  opacity: 0;
+  pointer-events: none;
+}
+.countdown.is-shown {
+  animation: cd-pop 0.7s ease-out;
+}
+@keyframes cd-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.4);
+  }
+  40% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+}
+
+/* Controles táctiles */
+.touch-pad {
+  position: absolute;
+  inset: auto 0 0 0;
+  z-index: 25;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 18px 22px;
+  pointer-events: none;
+}
+.touch-cluster {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  pointer-events: auto;
+}
+.touch-right {
+  align-items: flex-end;
+}
+.touch-btn {
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 1px;
+  color: #e6ebf5;
+  background: rgba(30, 36, 52, 0.6);
+  border: 2px solid rgba(120, 140, 180, 0.4);
+  border-radius: 50%;
+  width: 66px;
+  height: 66px;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+}
+.touch-btn.is-active {
+  background: rgba(59, 167, 255, 0.5);
+  border-color: #3ba7ff;
+}
+.touch-gas {
+  width: 84px;
+  height: 84px;
+  background: rgba(92, 225, 166, 0.35);
+  border-color: rgba(92, 225, 166, 0.6);
+}
+.touch-boost {
+  width: 84px;
+  height: 84px;
+  border-radius: 20px;
+  background: rgba(255, 138, 61, 0.35);
+  border-color: rgba(255, 138, 61, 0.6);
+}
+
+/* En pantallas con teclado, los controles táctiles estorban poco pero se
+   ocultan si el puntero es fino (mouse). */
+@media (pointer: fine) {
+  .touch-pad {
+    display: none;
+  }
+}
+
+/* Reloj en tiempo extra (gol de oro) */
+.score-time.is-overtime {
+  color: #ff8a3d;
+  text-shadow: 0 0 12px #ff8a3d;
+  opacity: 1;
+}
+
+/* Medidor de boost estilo RL: anillo cónico + número */
+.boost-meter {
+  --pct: 33;
+  position: absolute;
+  right: 24px;
+  bottom: 24px;
+  z-index: 22;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at center, rgba(8, 11, 20, 0.85) 58%, transparent 59%),
+    conic-gradient(#ffa62b calc(var(--pct) * 1%), rgba(60, 50, 30, 0.45) 0);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 18px rgba(255, 166, 43, 0.25);
+  pointer-events: none;
+}
+.boost-meter__num {
+  font-size: 30px;
+  font-weight: 800;
+  color: #ffc46b;
+  text-shadow: 0 0 12px rgba(255, 166, 43, 0.8);
+  line-height: 1;
+}
+.boost-meter__label {
+  font-size: 10px;
+  letter-spacing: 3px;
+  color: #b08a55;
+  margin-top: 2px;
+}
+.boost-meter.is-empty .boost-meter__num {
+  color: #6c6255;
+  text-shadow: none;
+}
+
+/* En táctil el medidor sube para no chocar con los botones */
+@media (pointer: coarse) {
+  .boost-meter {
+    right: 50%;
+    transform: translateX(50%);
+    bottom: 118px;
+    width: 76px;
+    height: 76px;
+  }
+  .boost-meter__num {
+    font-size: 24px;
+  }
+}
+
+/* Feed de quickchat (modo sala) */
+.chat-feed {
+  position: absolute;
+  top: 64px;
+  left: 18px;
+  z-index: 22;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+  max-width: 46vw;
+}
+.chat-row {
+  font-size: 14px;
+  letter-spacing: 1px;
+  color: #dfe6f5;
+  background: rgba(8, 11, 20, 0.6);
+  padding: 5px 12px;
+  border-radius: 10px;
+  border-left: 3px solid #5b6172;
+  animation: chat-in 0.18s ease-out;
+}
+.chat-row.blue {
+  border-left-color: #3ba7ff;
+}
+.chat-row.orange {
+  border-left-color: #ff8a3d;
+}
+.chat-name {
+  font-weight: 700;
+  color: #9fc0ff;
+}
+.chat-row.orange .chat-name {
+  color: #ffb37c;
+}
+@keyframes chat-in {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Ayuda de controles (solo desktop) */
+.controls-hint {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: #7b849c;
+  background: rgba(8, 11, 20, 0.45);
+  padding: 4px 14px;
+  border-radius: 8px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+@media (pointer: coarse) {
+  .controls-hint {
+    display: none;
+  }
+}
+
+/* Botones táctiles nuevos */
+.touch-drift {
+  border-radius: 20px;
+  background: rgba(255, 207, 61, 0.3);
+  border-color: rgba(255, 207, 61, 0.55);
+  font-size: 12px;
+}
+.touch-cam {
+  position: absolute;
+  right: 18px;
+  bottom: 210px;
+  width: 54px;
+  height: 54px;
+  font-size: 12px;
+  pointer-events: auto;
+}
+
+/* Fase de elección de equipo (modo sala) */
+.team-btn {
+  font-family: inherit;
+  cursor: pointer;
+  width: min(38vw, 240px);
+  min-height: 150px;
+  padding: 16px 12px;
+  border-radius: 16px;
+  background: rgba(14, 18, 30, 0.7);
+  border: 2px solid rgba(120, 140, 180, 0.35);
+  color: #e6ebf5;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  transition: transform 0.1s, border-color 0.15s, box-shadow 0.2s;
+}
+.team-btn:hover {
+  transform: translateY(-2px);
+}
+.team-btn__label {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 3px;
+}
+.team-btn.blue .team-btn__label {
+  color: #3ba7ff;
+  text-shadow: 0 0 12px #3ba7ff;
+}
+.team-btn.orange .team-btn__label {
+  color: #ff8a3d;
+  text-shadow: 0 0 12px #ff8a3d;
+}
+.team-btn.blue.is-picked {
+  border-color: #3ba7ff;
+  box-shadow: 0 0 22px rgba(59, 167, 255, 0.45);
+}
+.team-btn.orange.is-picked {
+  border-color: #ff8a3d;
+  box-shadow: 0 0 22px rgba(255, 138, 61, 0.45);
+}
+.team-btn__roster {
+  font-size: 14px;
+  letter-spacing: 1px;
+  color: #aab2c5;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 40px;
+}

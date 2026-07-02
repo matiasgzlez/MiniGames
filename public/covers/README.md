@@ -83,6 +83,12 @@ Square 1:1 video game cover art, bold indie game key art style, vibrant saturate
 Square 1:1 video game cover art, bold indie game key art style, vibrant saturated colors, dramatic lighting, clean composition with a strong focal subject, slight retro-arcade flavor, high detail digital illustration, no watermark, no borders. A spinning wooden log target covered in embedded ninja kunai knives, one kunai flying toward it with a golden motion trail, dark dojo background with paper lanterns, amber and gold palette, dramatic focus on the blade. The game title "KUNAI STRIKE" is integrated into the artwork as a bold stylized videogame logo, large and readable, spelled exactly "KUNAI STRIKE".
 ```
 
+## Rocket SpaceX — guardar como `rocket-arena.jpg`
+
+```text
+Square 1:1 video game cover art, bold indie game key art style, vibrant saturated colors, dramatic lighting, clean composition with a strong focal subject, slight retro-arcade flavor, high detail digital illustration, no watermark, no borders. Two rocket-powered cars, one glowing blue and one glowing orange, chasing a giant white soccer ball inside a futuristic neon stadium arena, boost flames trailing behind the cars, the ball flying toward a glowing goal, dynamic low camera angle, electric blue and orange palette on a dark arena floor with light lines. The game title "ROCKET SPACEX" is integrated into the artwork as a bold stylized videogame logo, large and readable, spelled exactly "ROCKET SPACEX".
+```
+
 ## Odd One Out — guardar como `odd-one-out.jpg`
 
 ```text
