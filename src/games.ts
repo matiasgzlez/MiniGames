@@ -96,6 +96,14 @@ export const games: GameEntry[] = [
     category: "Arcade",
   },
   {
+    id: "car-race",
+    title: "Neon Drift",
+    description: "Carrera 2D en circuitos neón: 5 pistas, mapa aleatorio y los autos de todos los jugadores en vivo.",
+    path: "/games/car-race/",
+    accent: "#00f0ff",
+    category: "Carreras",
+  },
+  {
     id: "odd-one-out",
     title: "Odd One Out",
     description: "Encuentra la ficha con el tono distinto antes de que se acabe el tiempo: la grilla crece y la diferencia se achica.",
@@ -118,6 +126,14 @@ export const games: GameEntry[] = [
     path: "/games/penalty-keeper/",
     accent: "#38e07b",
     category: "Reflejos",
+  },
+  {
+    id: "rocket-arena",
+    title: "Rocket SpaceX",
+    description: "Fútbol de autos en 3D estilo Rocket League: 2v2 con bots, o en salas con los autos de todos en vivo.",
+    path: "/games/rocket-arena/",
+    accent: "#3ba7ff",
+    category: "Carreras",
   },
 ];
 

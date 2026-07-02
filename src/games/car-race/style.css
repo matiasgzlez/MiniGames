@@ -1,0 +1,328 @@
+:root {
+  color-scheme: dark;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #0d0f12;
+  font-family: "Outfit", "Inter", "Segoe UI", sans-serif;
+  color: #ffffff;
+}
+
+#app {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.game-canvas {
+  display: block;
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+}
+
+.back-link {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 30;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.7);
+  text-decoration: none;
+  transition: color 0.2s ease, transform 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.back-link:hover {
+  color: #00f0ff;
+  transform: translateX(-2px);
+}
+
+.hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 56px 20px 20px;
+  z-index: 10;
+}
+
+.hud__top {
+  display: flex;
+  gap: 32px;
+  align-items: flex-start;
+}
+
+.hud__block {
+  display: flex;
+  flex-direction: column;
+}
+
+.hud__block--center {
+  flex: 1;
+  align-items: center;
+}
+
+.hud__block--right {
+  align-items: flex-end;
+  /* Deja lugar al minimapa que se dibuja en el canvas arriba a la derecha. */
+  margin-top: 130px;
+}
+
+.hud__label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.hud__value {
+  font-size: 26px;
+  font-weight: 700;
+  color: #00f0ff;
+  text-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+}
+
+.hud__value--time {
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud__track {
+  align-self: flex-start;
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 6px 12px;
+  border-radius: 20px;
+}
+
+/* Cuenta regresiva */
+.countdown {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 120px;
+  font-weight: 800;
+  z-index: 15;
+  pointer-events: none;
+  text-shadow: 0 0 40px currentColor;
+}
+
+.countdown.hidden {
+  display: none;
+}
+
+.countdown.pop {
+  animation: countdown-pop 0.4s ease-out;
+}
+
+@keyframes countdown-pop {
+  from {
+    transform: scale(1.6);
+    opacity: 0.2;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Overlays */
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(13, 15, 18, 0.85);
+  backdrop-filter: blur(8px);
+  z-index: 20;
+  transition: opacity 0.3s ease;
+  pointer-events: auto;
+}
+
+.overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.overlay__card {
+  background: linear-gradient(135deg, #161a22 0%, #0f1217 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 24px;
+  padding: 40px;
+  width: 90%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.overlay__title {
+  font-size: 36px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  margin-bottom: 8px;
+  background: linear-gradient(90deg, #00f0ff, #ff3f81);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 2px 8px rgba(0, 240, 255, 0.2));
+}
+
+.overlay__subtitle {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
+.overlay__stats {
+  display: flex;
+  justify-content: space-around;
+  width: 100%;
+  margin-bottom: 28px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.overlay__stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.overlay__stat-val {
+  font-size: 22px;
+  font-weight: 700;
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+}
+
+.overlay__stat-val.primary {
+  color: #00f0ff;
+}
+
+.overlay__stat-val.secondary {
+  color: #ffd700;
+}
+
+.overlay__button {
+  background: #00f0ff;
+  color: #0d0f12;
+  border: none;
+  padding: 14px 32px;
+  font-size: 16px;
+  font-weight: 700;
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(0, 240, 255, 0.3);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.overlay__button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(0, 240, 255, 0.45);
+}
+
+.overlay__button:active {
+  transform: translateY(1px);
+}
+
+.overlay__instructions {
+  margin-top: 24px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  line-height: 1.6;
+}
+
+/* Controles tactiles: direccion a la izquierda, pedales a la derecha. */
+.race-controls {
+  position: absolute;
+  bottom: 26px;
+  left: 0;
+  right: 0;
+  display: none;
+  justify-content: space-between;
+  padding: 0 26px;
+  z-index: 25;
+  pointer-events: none;
+}
+
+.race-controls__cluster {
+  display: flex;
+  gap: 14px;
+  pointer-events: auto;
+}
+
+.race-btn {
+  width: 68px;
+  height: 68px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(5px);
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: white;
+  font-size: 26px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  transition: background 0.1s, transform 0.1s;
+}
+
+.race-btn:active {
+  background: rgba(0, 240, 255, 0.35);
+  border-color: #00f0ff;
+  transform: scale(0.92);
+}
+
+.race-btn--gas:active {
+  background: rgba(57, 255, 20, 0.35);
+  border-color: #39ff14;
+}
+
+.race-btn--brake:active {
+  background: rgba(255, 63, 129, 0.35);
+  border-color: #ff3f81;
+}
+
+@media (max-width: 768px), (pointer: coarse) {
+  .race-controls {
+    display: flex;
+  }
+}
