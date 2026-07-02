@@ -35,8 +35,9 @@ export class InputController {
 
   /** Current keyboard steering direction: -1, 0 or 1. */
   getSteerDir(): number {
-    return (this.right ? 1 : 0) - (this.left ? 1 : 0);
+    return (this.left ? 1 : 0) - (this.right ? 1 : 0);
   }
+
 
   private onKeyDown = (e: KeyboardEvent): void => {
     if (e.code === "Enter") {
