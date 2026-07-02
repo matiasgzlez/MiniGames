@@ -8,7 +8,6 @@ import {
   joinRoom,
   sanitizeCode,
   startRound,
-  updateSettings,
 } from "../shared/room/api";
 import { RoomChannel } from "../shared/room/channel";
 import { computeRoundDeadline, randomGameId, roomGameUrl } from "../shared/room/roomMode";
@@ -91,7 +90,7 @@ async function autoJoin(code: string, player: string): Promise<void> {
   if (problem) renderHome(problem);
 }
 
-// ---------- Home: nombre + crear / unirse ----------
+// ---------- Home: nombre + unirse + boton para crear ----------
 
 function renderHome(joinProblem?: string): void {
   stack.innerHTML = "";
@@ -160,7 +159,33 @@ function renderHome(joinProblem?: string): void {
     if (e.key === "Enter") void tryJoin();
   });
 
-  // Crear una sala nueva.
+  // Boton para pasar a la pantalla de crear una sala.
+  const createPanel = document.createElement("div");
+  createPanel.className = "panel";
+  createPanel.innerHTML = `
+    <div class="panel__title">Crear una sala</div>
+    <p class="hint">Armá una sala nueva y compartí el código con tus amigos.</p>
+  `;
+  const createBtn = document.createElement("button");
+  createBtn.className = "btn btn--primary";
+  createBtn.type = "button";
+  createBtn.textContent = "Crear sala";
+  createBtn.addEventListener("click", () => {
+    const player = requireName();
+    if (!player) return;
+    renderCreate();
+  });
+  createPanel.append(createBtn);
+
+  stack.append(namePanel, joinPanel, createPanel);
+  if (prefillCode) codeInput.focus();
+}
+
+// ---------- Crear una sala: ajustes + crear ----------
+
+function renderCreate(): void {
+  stack.innerHTML = "";
+
   const createPanel = document.createElement("div");
   createPanel.className = "panel";
   createPanel.innerHTML = `<div class="panel__title">Crear una sala</div>`;
@@ -172,18 +197,35 @@ function renderHome(joinProblem?: string): void {
   };
   const settingsForm = buildSettingsForm(settings, (s) => (settings = s));
 
+  const actions = document.createElement("div");
+  actions.className = "panel__row rooms__create-actions";
+  const backBtn = document.createElement("button");
+  backBtn.className = "btn";
+  backBtn.type = "button";
+  backBtn.textContent = "Volver";
+  backBtn.addEventListener("click", () => renderHome());
   const createBtn = document.createElement("button");
   createBtn.className = "btn btn--primary";
   createBtn.type = "button";
   createBtn.textContent = "Crear sala";
+  actions.append(backBtn, createBtn);
+
   const createError = document.createElement("div");
   createError.className = "error";
 
   createBtn.addEventListener("click", () => {
     void (async () => {
       createError.textContent = "";
-      const player = requireName();
-      if (!player) return;
+      const player = getNickname();
+      if (!player) {
+        renderHome();
+        return;
+      }
+      // O elegís todos los juegos de la lista, o ninguno (se votan al azar).
+      if (settings.playlist && settings.playlist.length !== settings.totalRounds) {
+        createError.textContent = `Elegí ${settings.totalRounds} juegos o ninguno.`;
+        return;
+      }
       createBtn.disabled = true;
       const code = await createRoom(player, settings);
       createBtn.disabled = false;
@@ -195,10 +237,8 @@ function renderHome(joinProblem?: string): void {
     })();
   });
 
-  createPanel.append(settingsForm, createBtn, createError);
-
-  stack.append(namePanel, joinPanel, createPanel);
-  if (prefillCode) codeInput.focus();
+  createPanel.append(settingsForm, actions, createError);
+  stack.append(createPanel);
 }
 
 /**
@@ -221,9 +261,12 @@ function buildSettingsForm(
   let timeLimit: number = initial.roundTimeLimitSec;
   const playlist: string[] = initial.playlist ? [...initial.playlist] : [];
 
+  // La cantidad elegida arriba manda: es el tope de juegos que se pueden
+  // seleccionar. Con la lista completa (== totalRounds) salen esos en orden;
+  // vacia, se votan al azar. Parcial se bloquea al crear.
   const emit = (): void => {
     onChange({
-      totalRounds: playlist.length > 0 ? playlist.length : totalRounds,
+      totalRounds,
       playlist: playlist.length > 0 ? [...playlist] : null,
       roundTimeLimitSec: timeLimit,
     });
@@ -237,6 +280,9 @@ function buildSettingsForm(
     totalRounds,
     (v) => {
       totalRounds = v;
+      // Si ya se habian elegido mas juegos que el nuevo tope, recortar.
+      if (playlist.length > totalRounds) playlist.length = totalRounds;
+      refreshPlaylistUI();
       emit();
     },
   );
@@ -260,16 +306,22 @@ function buildSettingsForm(
   playlistGrid.className = "playlist";
 
   const refreshPlaylistUI = (): void => {
+    const atCap = playlist.length >= totalRounds;
     playlistGrid.querySelectorAll<HTMLButtonElement>(".playlist__item").forEach((btn) => {
       const idx = playlist.indexOf(btn.dataset.id!);
-      btn.classList.toggle("is-picked", idx >= 0);
+      const picked = idx >= 0;
+      btn.classList.toggle("is-picked", picked);
+      // Al llegar al tope no se pueden agregar mas; los ya elegidos siguen
+      // clickeables para poder sacarlos.
+      btn.classList.toggle("is-disabled", !picked && atCap);
       const badge = btn.querySelector<HTMLElement>(".playlist__order")!;
-      badge.style.display = idx >= 0 ? "" : "none";
+      badge.style.display = picked ? "" : "none";
       badge.textContent = String(idx + 1);
     });
-    const hasPlaylist = playlist.length > 0;
-    roundsLabel.style.display = hasPlaylist ? "none" : "";
-    roundsChoices.style.display = hasPlaylist ? "none" : "";
+    playlistLabel.textContent =
+      playlist.length > 0
+        ? `Elegir los juegos (${playlist.length}/${totalRounds})`
+        : "Elegir los juegos (opcional)";
   };
 
   for (const game of games) {
@@ -294,8 +346,13 @@ function buildSettingsForm(
     btn.querySelector(".playlist__cover")!.prepend(img);
     btn.addEventListener("click", () => {
       const idx = playlist.indexOf(game.id);
-      if (idx >= 0) playlist.splice(idx, 1);
-      else playlist.push(game.id);
+      if (idx >= 0) {
+        playlist.splice(idx, 1);
+      } else {
+        // No permitir elegir mas juegos que la cantidad marcada arriba.
+        if (playlist.length >= totalRounds) return;
+        playlist.push(game.id);
+      }
       refreshPlaylistUI();
       emit();
     });
@@ -306,7 +363,7 @@ function buildSettingsForm(
   const playlistHint = document.createElement("p");
   playlistHint.className = "hint";
   playlistHint.textContent =
-    "Si elegis juegos, salen en ese orden. Si no elegis ninguno, despues de cada juego se vota el siguiente entre 3 al azar.";
+    "Elegi en orden la misma cantidad de juegos que marcaste arriba. Si no elegis ninguno, despues de cada juego se vota el siguiente entre 3 al azar.";
 
   wrap.append(roundsLabel, roundsChoices, timeLabel, timeChoices, playlistLabel, playlistGrid, playlistHint);
   return wrap;
@@ -448,34 +505,13 @@ function renderLobby(code: string, player: string): void {
   const channel = new RoomChannel(code, player);
   let state: RoomState | null = null;
   let starting = false;
-  /** Ajustes editados por el host en el lobby (mandan al apretar Empezar). */
-  let localSettings: RoomSettings | null = null;
-  let settingsUiBuilt = false;
-
-  /** El host ve el formulario editable en lugar del resumen de solo lectura. */
-  const buildSettingsUi = (): void => {
-    if (settingsUiBuilt || !state) return;
-    settingsUiBuilt = true;
-    if (state.room.host !== player) return;
-
-    settingsEl.style.display = "none";
-    const form = buildSettingsForm(state.room.settings, (s) => {
-      localSettings = s;
-      // Compartir el cambio al instante para que los demas lo vean en vivo.
-      void updateSettings(code, s).then((ok) => {
-        if (ok) channel.ping();
-      });
-    });
-    panel.append(form);
-  };
 
   const render = (): void => {
     if (!state) return;
     const room = state.room;
-    const settings = localSettings ?? room.settings;
+    const settings = room.settings;
     const present = channel.presentPlayers();
     const isHost = room.host === player;
-    buildSettingsUi();
 
     const playlistText = settings.playlist
       ? settings.playlist
@@ -539,7 +575,7 @@ function renderLobby(code: string, player: string): void {
       if (!state || starting) return;
       starting = true;
       render();
-      const settings = localSettings ?? state.room.settings;
+      const settings = state.room.settings;
       const firstGame = settings.playlist ? settings.playlist[0] : randomGameId();
       const ok = await startRound(
         code,

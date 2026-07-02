@@ -7,6 +7,7 @@ A premium, glassmorphic reaction speed testing game. The game consists of 5 roun
 - `main.ts` — entry point, mounts the `Game` instance to `#app`.
 - `game/Game.ts` — controls the state machine, delta-time timers, user inputs (mouse clicks, touch events, and keyboard keys), and high-score persistence in localStorage.
 - `game/Hud.ts` — DOM overlay manager. Renders start screens, countdowns, top stats HUD (round counter, progress dots, average), state-specific screens (wait, trigger, early, result), and the game-over screen with a detailed summary table.
+- `game/SoundEffects.ts` — synthesized Web Audio effects (no assets): a sharp "go" beep the instant the card turns green, a crisp confirmation on a registered reaction, a low buzz on an early foul, and a rising flourish on the final results.
 - `game/constants.ts` — configuration tuning parameters: number of rounds, random delay range (2.0 to 5.0 seconds), storage key, and countdown steps.
 - `style.css` — modern stylesheet implementing CSS variables for card states, radial gradients for visual depth, backdrop-blur for overlays, and pop micro-animations.
 

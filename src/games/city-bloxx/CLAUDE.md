@@ -11,6 +11,7 @@ Nokia-style tower builder. A hook sweeps horizontally across the top carrying th
 - `game/Renderer.ts` — all canvas drawing (sky, clouds, ground, foundation, tilted tower with lit windows, crane jib/trolley/cable, the in-play block), in view units.
 - `game/InputController.ts` — keyboard + pointer → a single `onDrop` callback.
 - `game/Hud.ts` — DOM overlay (floor count, balance meter, start / game-over / countdown screens).
+- `game/SoundEffects.ts` — synthesized Web Audio effects: a whoosh on release, a thud when a floor lands (pitch rises with height), and a low crumble on topple/miss. No assets.
 - `game/constants.ts` — all tunable values (floor size, hook speed, drop gravity, lean/wobble, camera). **Tune here first.**
 
 ## Non-obvious decisions

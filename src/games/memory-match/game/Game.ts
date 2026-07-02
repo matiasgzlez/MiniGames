@@ -42,6 +42,8 @@ export class Game {
   private animating = false;
 
   private countdownTime = 0;
+  /** Last countdown index that played a tick, so each number sounds once. */
+  private lastCountdownIndex = -1;
   private lastTime = 0;
 
   constructor(container: HTMLElement) {
@@ -50,6 +52,7 @@ export class Game {
     // modo solo no corre nunca en sala, asi que getScore solo mira shared).
     this.room = initRoomMode("memory-match", {
       getScore: () => this.shared?.myPairs() ?? 0,
+      onStart: () => this.beginCountdown(),
     });
 
     this.hud.showStart(this.loadBest(), this.room !== null);
@@ -73,6 +76,7 @@ export class Game {
   private beginCountdown(): void {
     this.state = "countdown";
     this.countdownTime = 0;
+    this.lastCountdownIndex = -1;
     this.hud.hideOverlay();
     this.hud.showCountdown(COUNTDOWN_LABELS[0]);
 
@@ -194,7 +198,9 @@ export class Game {
       if (index >= COUNTDOWN_LABELS.length) {
         this.hud.showCountdown(null);
         this.startPlay();
-      } else {
+      } else if (index !== this.lastCountdownIndex) {
+        this.lastCountdownIndex = index;
+        SoundEffects.playCountdownTick();
         this.hud.showCountdown(COUNTDOWN_LABELS[index]);
       }
     } else if (this.state === "playing" && !this.room && this.soloState) {

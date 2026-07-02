@@ -17,6 +17,7 @@ import {
   BASE_LIGHTNESS,
 } from "./constants";
 import { Hud } from "./Hud";
+import { SoundEffects } from "./SoundEffects";
 import { initRoomMode, type RoomMode } from "../../../shared/room/roomMode";
 
 type State = "ready" | "countdown" | "playing" | "gameOver";
@@ -32,6 +33,8 @@ export class Game {
 
   private timeLeft = START_TIME;
   private countdownTime = 0;
+  /** Last countdown index that played a tick, so each number sounds once. */
+  private lastCountdownIndex = -1;
   private oddIndex = -1;
   private lastTime = 0;
 
@@ -44,7 +47,10 @@ export class Game {
     this.hud.updateBest(this.best);
 
     // Parcial por timeout: los aciertos acumulados de la partida en curso.
-    this.room = initRoomMode("odd-one-out", { getScore: () => this.score });
+    this.room = initRoomMode("odd-one-out", {
+      getScore: () => this.score,
+      onStart: () => this.beginCountdown(),
+    });
 
     window.addEventListener("keydown", this.handleKeyDown);
     this.hud.overlay.addEventListener("pointerdown", this.handleOverlayTap);
@@ -81,6 +87,7 @@ export class Game {
     this.score = 0;
     this.timeLeft = START_TIME;
     this.countdownTime = 0;
+    this.lastCountdownIndex = -1;
 
     this.hud.hideOverlay();
     this.hud.updateScore(0);
@@ -121,16 +128,19 @@ export class Game {
       this.score++;
       this.timeLeft = Math.min(MAX_TIME, this.timeLeft + HIT_BONUS);
       this.hud.updateScore(this.score);
+      SoundEffects.playCorrect(this.score);
       this.nextRound();
     } else {
       this.timeLeft -= MISS_PENALTY;
       this.hud.markMiss(tile);
+      SoundEffects.playWrong();
       if (this.timeLeft <= 0) this.endGame();
     }
   };
 
   private endGame(): void {
     this.state = "gameOver";
+    SoundEffects.playGameOver();
     this.timeLeft = 0;
     this.hud.updateTime(0);
     this.hud.clearBoard();
@@ -165,7 +175,9 @@ export class Game {
       if (index >= COUNTDOWN_LABELS.length) {
         this.hud.showCountdown(null);
         this.startRun();
-      } else {
+      } else if (index !== this.lastCountdownIndex) {
+        this.lastCountdownIndex = index;
+        SoundEffects.playCountdownTick();
         this.hud.showCountdown(COUNTDOWN_LABELS[index]);
       }
     } else if (this.state === "playing") {

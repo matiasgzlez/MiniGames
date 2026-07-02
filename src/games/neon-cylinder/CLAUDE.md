@@ -13,6 +13,7 @@ Controls: left/right (arrows or A/D, plus pointer) steer the orbit; **Space inst
 - `game/Obstacle.ts` + `game/ObstacleSpawner.ts` — pie-slice-gap discs: spawn, recycle, collision.
 - `game/InputController.ts` — keyboard + pointer input.
 - `game/Hud.ts` — DOM overlay (score, start/game-over screens).
+- `game/SoundEffects.ts` — synthesized Web Audio effects: a synth zap on flip, a blip per obstacle dodged, and a harsh crash on hit. No assets.
 - `game/constants.ts` — all tunable values (speeds, radii, gap sizes, spawn spacing, fog distances). **Tune here first** before touching logic.
 - `game/mathUtils.ts` — shared math helpers.
 

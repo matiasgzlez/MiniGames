@@ -14,6 +14,7 @@ Three-lane note-tapping game. Pieces of four **figures** (circle, triangle, diam
 - `game/Renderer.ts` — all canvas drawing (lane backdrop, hit line, neutral landing rings, pieces drawn as their figure with the key label, the figure→key legend, per-column flash), in view units. `drawFigure` traces each shape by its `FIGURES` name.
 - `game/InputController.ts` — figure keys → `onFigure(figure)`; pointer → `onLane(lane)` (column under the tap).
 - `game/Hud.ts` — DOM overlay (score, combo, best, health bar, judgment popup, start / game-over screens).
+- `game/SoundEffects.ts` — synthesized Web Audio feedback tones (no assets, no backing track): a bright note on Perfecto and a softer one on Bien (both climb a pentatonic ladder with the combo so runs sound melodic), a dull buzz on Fallo, and a descending figure on game over.
 - `game/constants.ts` — all tunable values (lanes, speeds, spawn rate, judgment windows, scoring, health). **Tune here first.**
 
 ## Non-obvious decisions
@@ -22,7 +23,7 @@ Three-lane note-tapping game. Pieces of four **figures** (circle, triangle, diam
 
 **Pointer→lane needs the inverse transform.** Because the view box is scaled/offset into the window, `Game.toViewX()` undoes that (`(clientX - rect.left) / fit - offsetX`) so a click maps to the correct lane. `InputController` is handed that function rather than reimplementing the math.
 
-**No audio / no fixed chart.** There's no music track to sync against, so notes spawn on a timer (not on musical beats) and difficulty is driven purely by the score: `NoteField` raises fall speed and shrinks the spawn interval as points climb. "Rhythm" is the visual cadence of notes reaching the line, not an audio beat map.
+**No fixed chart.** There's no music track to sync against, so notes spawn on a timer (not on musical beats) and difficulty is driven purely by the score: `NoteField` raises fall speed and shrinks the spawn interval as points climb. "Rhythm" is the visual cadence of notes reaching the line, not an audio beat map. Hits do play synthesized feedback tones (see `SoundEffects.ts`) whose pitch climbs a pentatonic ladder with the combo, so a clean run turns into a rising melody — but that's reactive per-tap feedback, not a chart the player follows.
 
 **Two judgment modes, one piece pool.** Keyboard judges by figure (`tapFigure`) so a piece in any column is cleared with its figure key; touch judges by column (`tapLane`) since you physically tap where the piece is. Both share `NoteField.judge()`.
 

@@ -20,6 +20,8 @@ Built with **Three.js** (see the repo's `threejs-*` skills).
 - `game/InputController.ts` — keyboard + pointer → discrete lane-change steps
   (`consumeSteer`) and an `onAnyInput` start/restart signal.
 - `game/Hud.ts` — DOM overlay (live score, start / game-over screens).
+- `game/SoundEffects.ts` — synthesized Web Audio effects (bounce on each
+  landing, descending swoop on the death-fall), no assets.
 - `game/constants.ts` — all tunable values (layout, speeds, camera, colors).
   **Tune here first** before touching logic.
 

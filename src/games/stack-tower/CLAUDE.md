@@ -14,6 +14,7 @@ ends. A near-perfect drop keeps the full width. Plain 2D `<canvas>`, no Three.js
 - `game/Renderer.ts` — all canvas drawing (background, rounded blocks, slivers, perfect flash), in view units.
 - `game/InputController.ts` — keyboard + pointer → a single `onDrop` callback.
 - `game/Hud.ts` — DOM overlay (live score, start / game-over screens).
+- `game/SoundEffects.ts` — synthesized Web Audio effects: a thunk on each placed block (pitch rises with height), a bright chime on a perfect drop, and a low crumble on a miss. No assets.
 - `game/constants.ts` — all tunable values (block size, speeds, perfect epsilon, camera, colors). **Tune here first.**
 
 ## Non-obvious decisions

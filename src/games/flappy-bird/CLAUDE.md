@@ -11,6 +11,7 @@ Classic side-scroller: a bird holds a fixed X while gravity pulls it down; each 
 - `game/Renderer.ts` — all canvas drawing (sky gradient, parallax clouds, pipes, scrolling ground, bird), in view units.
 - `game/InputController.ts` — keyboard + pointer → a single `onFlap` callback. Pointer input is attached to the `#app` container (not the canvas) so taps on the start / game-over overlay also count — required for mobile, where there is no Enter key. The leaderboard panel stops event propagation, so its input/buttons don't trigger a flap.
 - `game/Hud.ts` — DOM overlay (live score, start / game-over screens).
+- `game/SoundEffects.ts` — synthesized Web Audio effects (flap whoosh, score blip, crash thud), no assets. Called from `Game.ts` on flap, on each pipe cleared, and on death.
 - `game/constants.ts` — all tunable values (gravity, flap velocity, gap size, speeds, spacing). **Tune here first.**
 
 ## Non-obvious decisions

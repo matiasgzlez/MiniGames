@@ -236,6 +236,21 @@ a {
   border-color: var(--ink);
 }
 
+/* Fila Volver / Crear sala: mismo alto y ancho, sin el margen del primary. */
+.rooms__create-actions {
+  margin-top: 20px;
+  align-items: stretch;
+}
+
+.rooms__create-actions .btn {
+  flex: 1;
+}
+
+.rooms__create-actions .btn--primary {
+  width: auto;
+  margin-top: 0;
+}
+
 /* ---------- Choices (pills punteadas) ---------- */
 .choices {
   display: flex;
@@ -297,6 +312,12 @@ a {
 .playlist__item.is-picked {
   border-color: var(--ink);
   box-shadow: 0 0 0 2.5px var(--ink);
+}
+
+/* Tope de juegos alcanzado: los no elegidos quedan sin poder agregarse. */
+.playlist__item.is-disabled {
+  opacity: 0.4;
+  pointer-events: none;
 }
 
 /* Mini pantalla del juego: cuadrada, muestra la portada completa. */

@@ -10,6 +10,7 @@ import { Frog } from "./Frog";
 import { Obstacle } from "./Obstacle";
 import { Renderer } from "./Renderer";
 import { Hud } from "./Hud";
+import { SoundEffects } from "./SoundEffects";
 import { initRoomMode, type RoomMode } from "../../../shared/room/roomMode";
 
 type State = "ready" | "playing" | "dead" | "gameover";
@@ -66,7 +67,10 @@ export class Game {
     this.hud.setBest(this.best);
     this.hud.showStartScreen(this.best);
 
-    this.room = initRoomMode("mini-frogger", { getScore: () => this.score });
+    this.room = initRoomMode("mini-frogger", {
+      getScore: () => this.score,
+      onStart: () => this.start(),
+    });
 
     // Setup input listeners
     window.addEventListener("keydown", (e) => this.handleKeyDown(e));
@@ -108,6 +112,7 @@ export class Game {
     this.frog.snapToGrid();
 
     this.frog.move(dx, dy);
+    SoundEffects.playHop();
 
     // Award points based on the maximum distance (highest row reached)
     const currentDistance = -this.frog.gridY;
@@ -324,7 +329,7 @@ export class Game {
             obs.collidesWith(this.frog.x + 8, this.frog.targetY + 8, GRID_SIZE - 16)
           );
           if (hit) {
-            this.killFrog();
+            this.killFrog("crash");
           }
         } else if (currentLane.type === "river") {
           // Check support on log/turtle
@@ -335,14 +340,14 @@ export class Game {
             currentLogSpeed = supportObs.speed * supportObs.dir;
           } else {
             // Water death
-            this.killFrog();
+            this.killFrog("water");
           }
         }
       }
 
       // Check if camera scrolled past the frog (fell off screen)
       if (this.frog.y > this.cameraY + VIEW_HEIGHT + 10) {
-        this.killFrog();
+        this.killFrog("crash");
       }
     }
 
@@ -377,7 +382,9 @@ export class Game {
     }
   }
 
-  private killFrog(): void {
+  private killFrog(cause: "water" | "crash"): void {
+    if (cause === "water") SoundEffects.playSplash();
+    else SoundEffects.playSquash();
     this.frog.die();
     this.state = "dead";
   }

@@ -14,6 +14,7 @@ import {
 } from "./constants";
 import { Hud } from "./Hud";
 import { RaceChannel } from "./RaceChannel";
+import { SoundEffects } from "./SoundEffects";
 import { Renderer, type RemoteCar } from "./Renderer";
 import { TRACK_DEFS, buildTrack, type Track } from "./tracks";
 
@@ -42,6 +43,8 @@ export class Game {
   private sendAccMs = 0;
 
   private countdownLeft = 0;
+  /** Ultimo numero de cuenta regresiva que sono, para pitar una vez por tick. */
+  private lastCountdownBeep = 0;
   private startTime = 0;
   private finalMs = 0;
   private lap = 0;
@@ -173,12 +176,14 @@ export class Game {
   private beginCountdown(): void {
     this.state = "countdown";
     this.countdownLeft = COUNTDOWN_SEC;
+    this.lastCountdownBeep = COUNTDOWN_SEC + 1;
     this.hud.hideOverlay();
   }
 
   private go(): void {
     this.state = "racing";
     this.startTime = performance.now();
+    SoundEffects.playCountdownTick();
     this.hud.showCountdown("¡YA!", this.track.def.accent);
     window.setTimeout(() => this.hud.hideCountdown(), 700);
   }
@@ -269,7 +274,12 @@ export class Game {
       if (this.countdownLeft <= 0) {
         this.go();
       } else {
-        this.hud.showCountdown(String(Math.ceil(this.countdownLeft)), this.track.def.accent);
+        const shown = Math.ceil(this.countdownLeft);
+        if (shown !== this.lastCountdownBeep) {
+          this.lastCountdownBeep = shown;
+          SoundEffects.playCountdownTick();
+        }
+        this.hud.showCountdown(String(shown), this.track.def.accent);
       }
       return;
     }
@@ -307,6 +317,7 @@ export class Game {
       this.lap++;
       this.sectors = [false, false, false];
       if (this.lap >= this.track.def.laps) this.finishRace();
+      else SoundEffects.playLap();
     }
     this.prevS = s;
   }
@@ -314,6 +325,7 @@ export class Game {
   private finishRace(): void {
     this.finalMs = performance.now() - this.startTime;
     this.state = "finished";
+    SoundEffects.playFinish();
     this.hud.setTime(formatRaceTime(this.finalMs));
     this.hud.setLap(this.track.def.laps, this.track.def.laps);
 

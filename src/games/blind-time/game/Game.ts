@@ -58,6 +58,7 @@ export class Game {
     // Initialize multiplayer room support
     this.room = initRoomMode("blind-time", {
       getScore: () => this.calculateCurrentAverage() ?? 9999, // default large score if no rounds done
+      onStart: () => this.beginCountdown(),
     });
     
     this.bindInputs();

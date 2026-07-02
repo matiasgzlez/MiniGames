@@ -58,6 +58,8 @@ export class Game {
   private lastTime = 0;
   private laserCooldownRemaining = 0;
   private countdownTime = 0;
+  /** Last countdown index that played a tick, so each number sounds once. */
+  private lastCountdownIndex = -1;
   private asteroidSpawnTimer = 0;
 
   // Screen shake
@@ -77,7 +79,10 @@ export class Game {
     this.hud.setBest(this.bestScore);
     this.hud.showStart();
 
-    this.room = initRoomMode("asteroids", { getScore: () => this.score });
+    this.room = initRoomMode("asteroids", {
+      getScore: () => this.score,
+      onStart: () => this.beginCountdown(),
+    });
 
     // Initialize entities
     this.initGameObjects();
@@ -148,6 +153,7 @@ export class Game {
     this.spawnAsteroidsWave(6);
 
     this.countdownTime = COUNTDOWN_LABELS.length * COUNTDOWN_STEP;
+    this.lastCountdownIndex = -1;
   }
 
   private startGameplay(): void {
@@ -321,8 +327,12 @@ export class Game {
         const totalDuration = COUNTDOWN_LABELS.length * COUNTDOWN_STEP;
         const elapsedTime = totalDuration - this.countdownTime;
         const stepIdx = Math.floor(elapsedTime / COUNTDOWN_STEP);
-        const text = COUNTDOWN_LABELS[Math.max(0, Math.min(COUNTDOWN_LABELS.length - 1, stepIdx))];
-        this.hud.showCountdown(text);
+        const index = Math.max(0, Math.min(COUNTDOWN_LABELS.length - 1, stepIdx));
+        if (index !== this.lastCountdownIndex) {
+          this.lastCountdownIndex = index;
+          SoundEffects.playCountdownTick();
+        }
+        this.hud.showCountdown(COUNTDOWN_LABELS[index]);
       }
       return;
     }

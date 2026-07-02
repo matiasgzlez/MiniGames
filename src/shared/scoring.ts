@@ -74,6 +74,10 @@ export const GAME_SCORING: Record<string, GameScoring> = {
     variantLabel: (v) => `${v}x${v}`,
     format: formatTimeMoves,
   },
+  "shell-game": {
+    direction: "higher",
+    format: (n) => `Nivel ${n}`,
+  },
 };
 
 /**

@@ -28,6 +28,7 @@ Hecho con **Vite + TypeScript** (sin framework) y desplegado como sitio estátic
 | Rocket SpaceX | Carreras | Fútbol de autos 3D estilo Rocket League. |
 | Crono Ciego | Precisión | Detené el cronómetro a ciegas lo más cerca del objetivo. |
 | El Trile | Reflejos | Seguí con la mirada el vaso que oculta la moneda. |
+| Western Shoot | Precisión | Dispará a los blancos para sumar puntos y a los bandidos para que no te eliminen |
 
 ## Empezar
 
