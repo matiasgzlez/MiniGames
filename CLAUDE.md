@@ -1,6 +1,6 @@
 # MiniGames
 
-Monorepo of small browser minigames (Neon Cylinder, Flappy Bird, Stack Tower, Rhythm Tap, Jump Ball, Reaction Time, City Bloxx, Sliding Puzzle, Asteroids, Mini Frogger, and Kunai Throw), each independently playable, plus a landing page to pick one. Stack: Vite + TypeScript, no framework. Deployed as a static site (Vercel).
+Monorepo of small browser minigames (Neon Cylinder, Flappy Bird, Stack Tower, Rhythm Tap, Jump Ball, Reaction Time, City Bloxx, Sliding Puzzle, Asteroids, Mini Frogger, Odd One Out, Kunai Throw, and Memoria), each independently playable, plus a landing page to pick one. Stack: Vite + TypeScript, no framework. Deployed as a static site (Vercel).
 
 ## Conventions (must follow)
 
@@ -68,13 +68,17 @@ Architecture (Supabase, no server code):
 - **Host-authoritative**: only the host writes phase transitions (start/close round, open vote, finish); players write only their own rows. Points are computed client-side by the pure functions in `points.ts`. If the host disappears >20 s in a stable phase, anyone can take over.
 - Same spoofable trust level as `scores` (anon key + open RLS policies) — accepted and documented in the SQL.
 
-Files in `src/shared/room/`: `types.ts` (types + settings constants), `api.ts` (CRUD, no-op without credentials), `channel.ts` (`RoomChannel`), `points.ts` (`rankRound` / `computeTotals`, pure), `RoomOverlay.ts` (self-contained fixed full-screen DOM overlay: waiting / results / voting / final + top strip), `roomMode.ts` (orchestrator + the per-game contract).
+Files in `src/shared/room/`: `types.ts` (types + settings constants), `api.ts` (CRUD, no-op without credentials), `channel.ts` (`RoomChannel`), `points.ts` (`rankRound` / `computeTotals`, pure), `RoomOverlay.ts` (self-contained fixed full-screen DOM overlay: waiting / results / voting / final + top strip), `roomMode.ts` (orchestrator + the per-game contract), `matchState.ts` (generic shared-board match state, see below).
+
+**Shared-board games** (all players see and act on the same board, e.g. Memoria): durable per-round game state lives in `room_match_state` (one jsonb row per room+round, `supabase/rooms.sql`), accessed via `matchState.ts` (`fetchMatchState` / `createMatchState` / `updateMatchState` with an optimistic `version` column: writes carry the version they read; on conflict the caller refetches). Same write -> ping -> refetch pattern as everything else — good enough for turn-based games (~200-400 ms per move), not for real-time ones. For these games `RoomMode` exposes extra context (`code`, `me`, `round()`, `players()`, `isHost()`, `ping()`, `onSync()`); the host creates the initial board and unblocks AFK turns, the turn player writes moves (single atomic UPDATE resolving the whole attempt), and page reloads re-attach by refetching. `resetRoom` also wipes `room_match_state`.
 
 Per-game wiring (the only game-side code, ~4 lines in each `Game.ts`, `Hud.ts` untouched):
 - `private readonly room = initRoomMode("<id>", { getScore: () => this.score });` in the constructor. Returns `null` without `?room=` in the URL or without Supabase — zero impact outside room mode.
 - In the game-over restart input path: `if (this.room) return;` (one run per round; the overlay covers the game's own game-over screen).
 - In the game-over handler: `if (this.room) this.room.reportScore(score); else this.hud.showRanking(...)`. Room scores are **not** sent to the global leaderboard (timeout-cut runs would pollute it).
-- `getScore` is the live score for the timeout partial. Special cases: reaction-time reports the average of completed rounds; sliding-puzzle is fixed to 4x4 in room mode (`ROOM_VARIANTS`) and hides its size selector.
+- `getScore` is the live score for the timeout partial. Special cases: reaction-time reports the average of completed rounds; sliding-puzzle is fixed to 4x4 in room mode (`ROOM_VARIANTS`) and hides its size selector; memory-match swaps its solo time-attack for a shared turn-based board (see its `CLAUDE.md`) and scores "own pairs".
+
+Setup note: the rooms schema (including `room_match_state`) is `supabase/rooms.sql`; re-run it in the Supabase SQL Editor after pulling changes that touch it (statements are idempotent).
 
 Degradation matches the leaderboard: without credentials the landing button and `/rooms/` UI don't function and every game behaves exactly as before.
 

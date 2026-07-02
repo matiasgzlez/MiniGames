@@ -42,6 +42,22 @@ export interface RoomMode {
   readonly active: true;
   /** Llamar en el game-over, donde fuera del modo sala va hud.showRanking. */
   reportScore(finalScore: number): void;
+
+  // Contexto para juegos de tablero compartido (p.ej. Memoria). Los juegos
+  // "cada uno en su pantalla" siguen usando solo reportScore.
+  /** Codigo de la sala. */
+  readonly code: string;
+  /** Nickname propio. */
+  readonly me: string;
+  /** Numero de ronda que esta pagina esta jugando. */
+  round(): number;
+  /** Jugadores registrados en la sala (orden por joined_at, deterministico). */
+  players(): string[];
+  isHost(): boolean;
+  /** Avisa al resto que hay cambios en la DB (broadcast "sync"). */
+  ping(): void;
+  /** Se dispara cuando otro cliente hizo ping (releer la DB). */
+  onSync(cb: () => void): void;
 }
 
 /** Variante fija que usa cada juego con variantes cuando corre en modo sala. */
@@ -99,9 +115,20 @@ export function initRoomMode(gameId: string, hooks: RoomModeHooks): RoomMode | n
 
   const me = getNickname();
   if (!me) {
-    // Nunca se unio: que pase por el lobby a elegir nombre.
+    // Nunca se unio: que pase por el lobby a elegir nombre. Stub inerte
+    // mientras navega (la pagina se descarta enseguida).
     window.location.href = `/rooms/?code=${code}`;
-    return { active: true, reportScore: () => {} };
+    return {
+      active: true,
+      reportScore: () => {},
+      code,
+      me: "",
+      round: () => 0,
+      players: () => [],
+      isHost: () => false,
+      ping: () => {},
+      onSync: () => {},
+    };
   }
 
   const controller = new RoomModeController(gameId, code, me, hooks);
@@ -127,9 +154,11 @@ class RoomModeController implements RoomMode {
   private hostAbsentSince: number | null = null;
 
   private readonly gameId: string;
-  private readonly code: string;
-  private readonly me: string;
+  readonly code: string;
+  readonly me: string;
   private readonly hooks: RoomModeHooks;
+  /** Suscriptores del juego al broadcast "sync" (tableros compartidos). */
+  private readonly gameSyncCbs: Array<() => void> = [];
 
   constructor(gameId: string, code: string, me: string, hooks: RoomModeHooks) {
     this.gameId = gameId;
@@ -155,7 +184,10 @@ class RoomModeController implements RoomMode {
     );
 
     this.channel = new RoomChannel(this.code, this.me);
-    this.channel.onSync(() => void this.refresh());
+    this.channel.onSync(() => {
+      void this.refresh();
+      for (const cb of this.gameSyncCbs) cb();
+    });
     this.channel.onPresence(() => this.applyState());
 
     this.applyState(state);
@@ -166,6 +198,24 @@ class RoomModeController implements RoomMode {
 
   reportScore(finalScore: number): void {
     void this.submitScore(finalScore, true);
+  }
+
+  // ---------- Contexto para tableros compartidos ----------
+
+  round(): number {
+    return this.myRound;
+  }
+
+  players(): string[] {
+    return this.state?.players ?? [];
+  }
+
+  ping(): void {
+    this.channel?.ping();
+  }
+
+  onSync(cb: () => void): void {
+    this.gameSyncCbs.push(cb);
   }
 
   // ---------- Estado ----------
@@ -259,7 +309,7 @@ class RoomModeController implements RoomMode {
     window.location.href = url;
   }
 
-  private isHost(): boolean {
+  isHost(): boolean {
     return this.state?.room.host === this.me;
   }
 

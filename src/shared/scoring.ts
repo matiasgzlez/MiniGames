@@ -27,6 +27,10 @@ export const GAME_SCORING: Record<string, GameScoring> = {
   "mini-frogger": { direction: "higher" },
   "kunai-throw": { direction: "higher" },
   "odd-one-out": { direction: "higher" },
+  "memory-match": {
+    direction: "higher",
+    format: (n) => `${n} ${n === 1 ? "par" : "pares"}`,
+  },
   "reaction-time": {
     direction: "lower",
     format: (n) => `${Math.round(n)} ms`,

@@ -104,6 +104,14 @@ export const games: GameEntry[] = [
     category: "Reflejos",
   },
   {
+    id: "memory-match",
+    title: "Memoria",
+    description: "Encuentra los pares dando vuelta las cartas: contrarreloj en solitario, y por turnos sobre un tablero compartido en las salas.",
+    path: "/games/memory-match/",
+    accent: "#ffd24a",
+    category: "Puzzle",
+  },
+  {
     id: "kunai-throw",
     title: "Kunai Strike",
     description: "Arroja kunais y clávalos en el tronco que gira sin que un kunai golpee a otro.",

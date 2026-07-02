@@ -66,11 +66,27 @@ create table if not exists public.room_votes (
   constraint player_len check (char_length(player) between 1 and 12)
 );
 
+-- Estado de partida compartido (juegos de tablero comun, p.ej. Memoria): una
+-- fila por (sala, ronda) con el estado completo del juego en jsonb. La columna
+-- version implementa concurrencia optimista: cada escritura hace
+-- update ... where version = <esperada> e incrementa; si no matchea, el
+-- cliente refetchea. Solo escribe el jugador de turno (o el host para
+-- destrabar), por convencion del cliente como todo lo demas.
+create table if not exists public.room_match_state (
+  code       text not null references public.rooms(code) on delete cascade,
+  round_no   int  not null,
+  state      jsonb not null,
+  version    int  not null default 0,
+  updated_at timestamptz not null default now(),
+  primary key (code, round_no)
+);
+
 alter table public.rooms enable row level security;
 alter table public.room_players enable row level security;
 alter table public.room_rounds enable row level security;
 alter table public.room_round_scores enable row level security;
 alter table public.room_votes enable row level security;
+alter table public.room_match_state enable row level security;
 
 -- Lectura publica de todo (los codigos de sala son el unico "secreto").
 drop policy if exists "rooms_select_public" on public.rooms;
@@ -91,6 +107,10 @@ create policy "room_round_scores_select_public" on public.room_round_scores
 
 drop policy if exists "room_votes_select_public" on public.room_votes;
 create policy "room_votes_select_public" on public.room_votes
+  for select using (true);
+
+drop policy if exists "room_match_state_select_public" on public.room_match_state;
+create policy "room_match_state_select_public" on public.room_match_state
   for select using (true);
 
 -- Escritura anonima con validaciones minimas (los checks de tabla ya cubren
@@ -137,6 +157,14 @@ drop policy if exists "room_votes_update_public" on public.room_votes;
 create policy "room_votes_update_public" on public.room_votes
   for update using (true) with check (true);
 
+drop policy if exists "room_match_state_insert_public" on public.room_match_state;
+create policy "room_match_state_insert_public" on public.room_match_state
+  for insert with check (true);
+
+drop policy if exists "room_match_state_update_public" on public.room_match_state;
+create policy "room_match_state_update_public" on public.room_match_state
+  for update using (true) with check (true);
+
 -- "Jugar otra vez": al terminar, el host resetea la sala al lobby borrando el
 -- historial de rondas/puntajes/votos (los jugadores registrados se conservan).
 drop policy if exists "room_rounds_delete_public" on public.room_rounds;
@@ -149,6 +177,10 @@ create policy "room_round_scores_delete_public" on public.room_round_scores
 
 drop policy if exists "room_votes_delete_public" on public.room_votes;
 create policy "room_votes_delete_public" on public.room_votes
+  for delete using (true);
+
+drop policy if exists "room_match_state_delete_public" on public.room_match_state;
+create policy "room_match_state_delete_public" on public.room_match_state
   for delete using (true);
 
 -- Limpieza opcional: las filas son minusculas, pero si algun dia molesta se

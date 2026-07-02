@@ -89,6 +89,12 @@ Square 1:1 video game cover art, bold indie game key art style, vibrant saturate
 Square 1:1 video game cover art, bold indie game key art style, vibrant saturated colors, dramatic lighting, clean composition with a strong focal subject, slight retro-arcade flavor, high detail digital illustration, no watermark, no borders. A neat glowing grid of rounded square tiles all the same soft purple except one tile with a subtly different shade that clearly stands out, a bright spotlight and a magnifying glass focusing on the odd tile, a thin ticking countdown arc wrapping around the grid, minimal geometric composition, purple and violet neon palette on a dark background. The game title "ODD ONE OUT" is integrated into the artwork as a bold stylized videogame logo, large and readable, spelled exactly "ODD ONE OUT".
 ```
 
+## Memoria — guardar como `memory-match.jpg`
+
+```text
+Square 1:1 video game cover art, bold indie game key art style, vibrant saturated colors, dramatic lighting, clean composition with a strong focal subject, slight retro-arcade flavor, high detail digital illustration, no watermark, no borders. A dark neon grid of face-down memory cards with thin golden ring emblems on their backs, two cards flipped and glowing: one revealing a bright yellow circle symbol with golden edge glow, another revealing a cyan square symbol with cyan edge glow, a small neon blue brain icon and tiny stars floating above, deep navy background, yellow and cyan palette. The game title "MEMORIA" is integrated into the artwork as a bold stylized videogame logo, large and readable, spelled exactly "MEMORIA".
+```
+
 ## Fondo del banner de salas — guardar como `rooms-banner.jpg`
 
 Fondo del banner "¡Jugá con amigos!" de la home. El banner es una franja muy

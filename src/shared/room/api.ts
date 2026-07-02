@@ -296,6 +296,7 @@ export async function resetRoom(code: string): Promise<boolean> {
     supabase.from("room_rounds").delete().eq("code", code),
     supabase.from("room_round_scores").delete().eq("code", code),
     supabase.from("room_votes").delete().eq("code", code),
+    supabase.from("room_match_state").delete().eq("code", code),
   ]);
   const failed = deletes.find((r) => r.error);
   if (failed?.error) {
