@@ -2,10 +2,12 @@
 
 Discreet homage to the arcade classic Tapper, reshaped to this repo's
 formula: no levels — a single endless run where the difficulty ramps with
-elapsed time, three strikes end the night, score is points. Four terraced
-bar counters in a night bar; customers walk in from the left toward the
-taps, the bartender serves beers that slide down the counter, catches the
-empties (and tips) that slide back, and loses when misses pile up.
+elapsed time, six strikes end the night (`MAX_MISSES`), score is points.
+Four bar
+counters (coplanar — see `LANE_STEP_Y`) in a night bar seen from a fixed
+elevated corner; customers walk in from off-camera toward the taps, the
+bartender serves beers that slide down the counter, catches the empties
+(and tips) that slide back, and loses when misses pile up.
 
 Retro **HD-2D** like Keepers! (`penalty-keeper`): procedural pixel-art
 sprites (canvas rect-lists, `NearestFilter`) as lit planes
@@ -30,9 +32,10 @@ bulbs, backlit bottles and the moon actually glow.
   sometimes a tip coin follows (`TIP_CHANCE`).
 - Catching a tip gives points and slows every customer for
   `TIP_SLOW_DURATION` (the "floor show" of the original, abstracted).
-- Three strike causes: a customer reaches `END_X`, an empty mug falls
-  past `CATCH_X + FALL_MARGIN` with the bartender elsewhere, a beer
-  reaches `CRASH_X` with nobody to take it (the anti-spam rule).
+- Three ways to earn a strike: a customer reaches `END_X`, an empty mug
+  falls past `CATCH_X + FALL_MARGIN` with the bartender elsewhere, a beer
+  reaches `CRASH_X` with nobody to take it (the anti-spam rule). Missed
+  empties (`mugFell`) are by far the most common — see the difficulty note.
 - Punks (pink mohawk) walk `PUNK_SPEED_FACTOR` faster and pay more.
 - Left out on purpose: the original's shell-game bonus round (it already
   exists in this repo as El Trile) and its points-based extra lives.
@@ -43,7 +46,8 @@ bulbs, backlit bottles and the moon actually glow.
 - `game/Game.ts` — scene/camera/renderer + composer, the `ready ->
   countdown -> playing -> dead` state machine, event handling (score,
   strikes, pulses, shake), pointer->lane mapping (projects each lane's
-  spot to screen Y), the tap glint / beer-tracking light, room wiring.
+  spot to screen Y), the tap light (dim pour -> full-mug flash -> off once
+  the beer is sliding, so the trip isn't lit), room wiring.
 - `game/constants.ts` — every tunable (layout, pour, speeds, points,
   difficulty phases, bloom). **Tune here first.**
 - `game/layout.ts` — the terraced-lane formulas (floor/counter-top/Z per
@@ -56,16 +60,26 @@ bulbs, backlit bottles and the moon actually glow.
   sliding, every win/fail as a `LaneEvent[]` the Game consumes. Owns the
   patron sprite planes and mug/coin props (disposed on removal).
 - `game/props.ts` — 3D mugs (glass + scalable liquid + foam) and the
-  emissive tip coin; slightly emissive so they pop and bloom.
-- `game/Barroom.ts` — the world and the light rig: terraced floors,
+  emissive tip coin; slightly emissive so they pop and bloom. `setMugFill`
+  takes an `isSliding` flag: the mug under the tap stays dim while filling
+  and flashes bright at 100% (the destello), but a served/sliding mug is
+  kept dim so it doesn't light its trip down the counter. `makeMug(true)`
+  adds two hairline red emissive rings so the empties sliding back read
+  apart from the amber full beers.
+- `game/Barroom.ts` — the world and the light rig: one flat floor,
   counters with brass taps, back wall with backlit bottle shelves, neon
   "BAR" (magenta, flickers) and cocktail (cyan) signs each backed by a
-  matching PointLight, moon window + cool rim, jukebox with hue-cycling
-  glow, hanging lamps (4 warm spots, only lanes 0 and 2 cast shadows —
-  budget), booth crowd (two swapped textures), and the `pulseGood` /
-  `pulseBad` event lights the Game spikes.
+  matching PointLight, a floor-to-ceiling city picture window on the +X
+  side wall (`buildCityWindow`, emissive skyline behind a real mullion
+  frame) + cool rim, a warm front key and a spawn-side fill, two rows of
+  hanging lamps per lane (`LAMP_SPAWN_X` over the walk-in, `LAMP_TAP_X`
+  by the serve end; only the spawn-side lamps of lanes 0 and 2 cast
+  shadows — budget), a front lounge of bistro tables with backed chairs
+  dressing the empty foreground (`buildLounge` / `makeDinerSet` /
+  `makeChair`) under a soft warm lounge fill, booth crowd (two swapped
+  textures), and the `pulseGood` / `pulseBad` event lights the Game spikes.
 - `game/sprites.ts` — all procedural art: bartender/patron frame sets,
-  wood/wall/shelf/neon/window/booth/jukebox textures, `makeSpritePlane` /
+  wood/wall/shelf/neon/city-window/booth textures, `makeSpritePlane` /
   `setSpriteFrame` helpers (same contract as Keepers!: swap the frame on
   both materials or the shadow lags).
 - `game/SoundEffects.ts` — synthesized PSG effects: pour foam swell,
@@ -78,12 +92,27 @@ bulbs, backlit bottles and the moon actually glow.
 
 ## Difficulty: four time-driven phases (`Lanes.paramsAt`)
 
-- **A. Warmup** (0-15 s) — two lanes, slow strollers, long gaps.
-- **B. Ritmo** (15-60 s) — interval 2.2 -> 1.4 s, speed climbs; lane 3
-  opens at 25 s, lane 4 at 40 s; punks/groups fade in to 15%.
-- **C. Mezcla** (60-120 s) — interval to 1.0 s, speed to 0.95 m/s, punks
+All four bars are open from the first customer; difficulty ramps via
+cadence, speed, punks and groups — not by opening lanes.
+
+- **A. Warmup** (0-15 s) — interval 4.5 s, slow strollers, long gaps.
+- **B. Ritmo** (15-60 s) — interval 3.6 -> 2.0 s, speed climbs;
+  punks/groups fade in to 15%.
+- **C. Mezcla** (60-120 s) — interval to 1.4 s, speed to 0.95 m/s, punks
   to 35%, groups (two at once) to 30%.
 - **D. Inferno** (120 s+) — capped values blended in over 10 s, no cliff.
+
+Intervals and `MAX_MISSES` (6) were tuned by Monte Carlo (5000 runs each,
+a movement/reaction-limited player model): with 6 lives a skilled player
+clears 500 points ~95% of runs, a medium one ~57%, a slow one ~15%. Spawn
+interval has a weak effect on that — the real bottleneck is catching the
+returning empties (`mugFell` is the dominant strike), which is why the
+extra lives moved the needle far more than the flow rate did.
+
+**Spawns spread across the bars.** `Lanes.pickLane` sends each customer to
+the emptiest open bar that still has entrance room (`laneHasRoom`), random
+among ties — so they fan out over the four counters instead of piling onto
+one or two. A group spawn puts its second customer on the same bar.
 
 ## Non-obvious decisions
 
@@ -96,8 +125,8 @@ bulbs, backlit bottles and the moon actually glow.
   the moment it is past `CATCH_X` while the bartender is on that lane
   (a `FALL_MARGIN` window), so arriving slightly late still saves it.
 - **Visible fixtures are the real lights**: every light has an emissive
-  mesh at its position (lamps/bulbs, neon tubes, bottle backlight, moon,
-  jukebox arch) so shadows and glows match what the eye sees.
+  mesh at its position (lamps/bulbs, neon tubes, bottle backlight, city
+  window) so shadows and glows match what the eye sees.
 - **`dt` is clamped** (`MAX_DT`) so a tab-switch can't teleport mugs past
   their judgment windows.
 - **Enter-to-start countdown**: standard repo pattern, 3/2/1/YA with the

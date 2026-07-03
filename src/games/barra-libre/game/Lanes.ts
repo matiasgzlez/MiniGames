@@ -5,7 +5,6 @@ import {
   DRINK_TIME,
   END_X,
   FIRST_SPAWN_DELAY,
-  FOURTH_LANE_AT_S,
   GROUP_GAP,
   INFERNO_BLEND_S,
   INFERNO_GROUP,
@@ -38,13 +37,11 @@ import {
   SPAWN_CLEARANCE,
   SPAWN_X,
   TAP_X,
-  THIRD_LANE_AT_S,
   TIP_CHANCE,
   TIP_SPEED,
   WALK_STRIDE,
   WARMUP_END_S,
   WARMUP_INTERVAL,
-  WARMUP_LANES,
   WARMUP_SPEED,
 } from "./constants";
 import { laneCounterTopY, laneFloorY, lanePeopleZ, laneZ } from "./layout";
@@ -112,9 +109,11 @@ interface SpawnParams {
 
 const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
 
-/** Difficulty phases, resolved per spawn from the elapsed play time.
- *  A warmup, B ritmo (cadence climbs, lanes open), C mezcla (punks and
- *  groups ramp in), D inferno (capped chaos, blended in smoothly). */
+/** Difficulty phases, resolved per spawn from the elapsed play time. All
+ *  four bars are open throughout (spawns spread across them, see pickLane);
+ *  difficulty ramps via cadence, speed, punks and groups. A warmup, B ritmo
+ *  (cadence climbs), C mezcla (punks and groups ramp in), D inferno (capped
+ *  chaos, blended in smoothly). */
 export function paramsAt(elapsed: number): SpawnParams {
   if (elapsed < WARMUP_END_S) {
     return {
@@ -122,11 +121,9 @@ export function paramsAt(elapsed: number): SpawnParams {
       speed: WARMUP_SPEED,
       punkChance: 0,
       groupChance: 0,
-      lanes: WARMUP_LANES,
+      lanes: LANE_COUNT,
     };
   }
-  const lanes =
-    2 + (elapsed >= THIRD_LANE_AT_S ? 1 : 0) + (elapsed >= FOURTH_LANE_AT_S ? 1 : 0);
   if (elapsed < RITMO_END_S) {
     const t = (elapsed - WARMUP_END_S) / (RITMO_END_S - WARMUP_END_S);
     return {
@@ -134,7 +131,7 @@ export function paramsAt(elapsed: number): SpawnParams {
       speed: lerp(RITMO_SPEED_START, RITMO_SPEED_END, t),
       punkChance: lerp(0, RITMO_PUNK_END, t),
       groupChance: lerp(0, RITMO_GROUP_END, t),
-      lanes,
+      lanes: LANE_COUNT,
     };
   }
   if (elapsed < INFERNO_START_S) {
@@ -144,7 +141,7 @@ export function paramsAt(elapsed: number): SpawnParams {
       speed: lerp(MIX_SPEED_START, MIX_SPEED_END, t),
       punkChance: lerp(MIX_PUNK_START, MIX_PUNK_END, t),
       groupChance: lerp(MIX_GROUP_START, MIX_GROUP_END, t),
-      lanes,
+      lanes: LANE_COUNT,
     };
   }
   // Blend from the end of phase C into the inferno so there is no cliff.
@@ -154,7 +151,7 @@ export function paramsAt(elapsed: number): SpawnParams {
     speed: lerp(MIX_SPEED_END, INFERNO_SPEED, t),
     punkChance: lerp(MIX_PUNK_END, INFERNO_PUNK, t),
     groupChance: lerp(MIX_GROUP_END, INFERNO_GROUP, t),
-    lanes,
+    lanes: LANE_COUNT,
   };
 }
 
@@ -195,7 +192,7 @@ export class Lanes {
   /** A full mug leaves the tap and slides down the lane. */
   serve(lane: number): void {
     const mug = makeMug();
-    setMugFill(mug, 1);
+    setMugFill(mug, 1, true);
     this.placeSlider(mug.group, lane, TAP_X - 0.25);
     this.object.add(mug.group);
     this.sliders.push({ lane, x: TAP_X - 0.25, kind: "beer", obj: mug.group, mug });
@@ -286,15 +283,9 @@ export class Lanes {
 
   private spawn(elapsed: number): void {
     const params = paramsAt(elapsed);
-    // Pick an open lane at random among the ones this phase allows.
-    const order = [...Array(Math.min(params.lanes, LANE_COUNT)).keys()];
-    for (let i = order.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [order[i], order[j]] = [order[j], order[i]];
-    }
-    const lane = order.find((l) => this.laneHasRoom(l));
+    const lane = this.pickLane(params.lanes);
     if (lane === undefined) {
-      this.spawnTimer = 0.4; // everything crowded: retry soon
+      this.spawnTimer = 0.4; // every open bar crowded at the entrance: retry soon
       return;
     }
     this.spawnCustomer(lane, SPAWN_X, params);
@@ -302,6 +293,33 @@ export class Lanes {
       this.spawnCustomer(lane, SPAWN_X - GROUP_GAP, params);
     }
     this.spawnTimer = params.interval * (0.85 + Math.random() * 0.3);
+  }
+
+  /** Send the next customer to the emptiest open bar that still has entrance
+   *  room, random among ties — so they spread out instead of piling on one. */
+  private pickLane(openLanes: number): number | undefined {
+    const n = Math.min(openLanes, LANE_COUNT);
+    let best: number[] = [];
+    let bestLoad = Infinity;
+    for (let lane = 0; lane < n; lane++) {
+      if (!this.laneHasRoom(lane)) continue;
+      const load = this.laneLoad(lane);
+      if (load < bestLoad) {
+        bestLoad = load;
+        best = [lane];
+      } else if (load === bestLoad) {
+        best.push(lane);
+      }
+    }
+    if (best.length === 0) return undefined;
+    return best[Math.floor(Math.random() * best.length)];
+  }
+
+  /** How many customers (walking or drinking) currently occupy a bar. */
+  private laneLoad(lane: number): number {
+    let count = 0;
+    for (const c of this.customers) if (c.lane === lane) count++;
+    return count;
   }
 
   private laneHasRoom(lane: number): boolean {
@@ -364,8 +382,8 @@ export class Lanes {
       this.sliders.push({ lane, x, kind, obj: coin, mug: null });
       return;
     }
-    const mug = makeMug();
-    setMugFill(mug, 0);
+    const mug = makeMug(true);
+    setMugFill(mug, 0, true);
     this.placeSlider(mug.group, lane, x);
     this.object.add(mug.group);
     this.sliders.push({ lane, x, kind, obj: mug.group, mug });

@@ -19,8 +19,10 @@ import {
   CAM_FOLLOW_Y,
   CAM_FOV,
   CAM_LERP,
+  CAM_LOOK_X,
   CAM_LOOK_Y,
   CAM_LOOK_Z,
+  CAM_POS_X,
   CAM_POS_Y,
   CAM_POS_Z,
   COLOR_BACKGROUND,
@@ -85,6 +87,8 @@ export class Game {
   private slowTimer = 0;
   /** Remaining camera-shake time after a strike, s. */
   private shakeTime = 0;
+  /** Flash intensity when a beer is fully poured. */
+  private pourFlash = 0;
   private lastTime = performance.now();
 
   private readonly lookTarget = new THREE.Vector3(0, CAM_LOOK_Y, CAM_LOOK_Z);
@@ -100,7 +104,7 @@ export class Game {
       0.1,
       80,
     );
-    this.camera.position.set(0, CAM_POS_Y, CAM_POS_Z);
+    this.camera.position.set(CAM_POS_X, CAM_POS_Y, CAM_POS_Z);
     this.camera.lookAt(this.lookTarget);
 
     this.renderer = new THREE.WebGLRenderer({ powerPreference: "high-performance" });
@@ -306,7 +310,10 @@ export class Game {
     this.slowTimer = Math.max(0, this.slowTimer - dt);
     const slowFactor = this.slowTimer > 0 ? TIP_SLOW_FACTOR : 1;
 
-    if (this.bartender.update(dt)) SoundEffects.playFull();
+    if (this.bartender.update(dt)) {
+      SoundEffects.playFull();
+      this.pourFlash = 1.0;
+    }
 
     const events = this.lanes.update(dt, this.elapsed, slowFactor, this.bartender.lane);
     for (const event of events) {
@@ -363,22 +370,23 @@ export class Game {
     if (this.misses >= MAX_MISSES) this.die();
   }
 
-  /** Dynamic lighting: the tap glint while pouring, a glint chasing the
-   *  frontmost sliding beer otherwise, and the feedback pulse decays. */
+  /** Dynamic lighting: the tap stays dim while pouring and flashes when the
+   *  mug tops off (destello); once the beer is sliding the tap light fades
+   *  out so the trip down the counter isn't lit. Feedback pulses decay. */
   private updateLights(dt: number): void {
+    this.pourFlash = Math.max(0, this.pourFlash - dt * 5.0);
+
     if (this.bartender.locked) {
       const lane = this.bartender.lane;
       this.tapLight.position.set(TAP_X - 0.2, laneCounterTopY(lane) + 0.5, laneZ(lane) + 0.1);
-      this.tapLight.intensity = 1.5 + this.bartender.pourLevel * 3;
-    } else {
-      const beer = this.lanes.frontBeer();
-      if (beer) {
-        this.tapLight.position.copy(beer.position);
-        this.tapLight.position.y += 0.35;
-        this.tapLight.intensity = 4;
+      if (this.bartender.pour === "full") {
+        this.tapLight.intensity = 3.0 + this.pourFlash * 8.0;
       } else {
-        this.tapLight.intensity = Math.max(0, this.tapLight.intensity - dt * 18);
+        this.tapLight.intensity = 0.8;
       }
+    } else {
+      // Not pouring: the tap light fades out (no glint chasing the beer).
+      this.tapLight.intensity = Math.max(0, this.tapLight.intensity - dt * 18);
     }
 
     this.barroom.pulseGood.intensity = Math.max(0, this.barroom.pulseGood.intensity - dt * 80);
@@ -386,12 +394,13 @@ export class Game {
   }
 
   private updateCamera(dt: number): void {
-    // The camera rises a touch with the bartender's lane (parallax).
+    const targetX = CAM_POS_X;
     const targetY = CAM_POS_Y + this.bartender.visualLane * CAM_FOLLOW_Y;
+    const targetZ = CAM_POS_Z;
     const t = Math.min(1, dt * CAM_LERP);
+    this.camera.position.x += (targetX - this.camera.position.x) * t;
     this.camera.position.y += (targetY - this.camera.position.y) * t;
-    this.camera.position.x = 0;
-    this.camera.position.z = CAM_POS_Z;
+    this.camera.position.z += (targetZ - this.camera.position.z) * t;
 
     if (this.shakeTime > 0) {
       this.shakeTime = Math.max(0, this.shakeTime - dt);
@@ -400,7 +409,11 @@ export class Game {
       this.camera.position.y += (Math.random() * 2 - 1) * amp;
     }
 
-    this.lookTarget.set(0, CAM_LOOK_Y + this.bartender.visualLane * CAM_FOLLOW_Y * 0.6, CAM_LOOK_Z);
+    this.lookTarget.set(
+      CAM_LOOK_X,
+      CAM_LOOK_Y + this.bartender.visualLane * CAM_FOLLOW_Y * 0.6,
+      CAM_LOOK_Z,
+    );
     this.camera.lookAt(this.lookTarget);
   }
 

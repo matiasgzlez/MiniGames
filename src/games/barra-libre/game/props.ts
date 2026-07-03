@@ -15,8 +15,10 @@ export interface MugMesh {
   foam: THREE.Mesh;
 }
 
-/** A glass mug with a handle. `setMugFill` drives the liquid level. */
-export function makeMug(): MugMesh {
+/** A glass mug with a handle. `setMugFill` drives the liquid level.
+ *  `emptyRim` traces the glass in a thin, faint red glow so the empties
+ *  sliding back read apart from the amber full beers. */
+export function makeMug(emptyRim = false): MugMesh {
   const group = new THREE.Group();
 
   const glassMat = new THREE.MeshStandardMaterial({
@@ -70,13 +72,31 @@ export function makeMug(): MugMesh {
   handle.rotation.set(0, Math.PI / 2, Math.PI / 2);
   group.add(handle);
 
+  if (emptyRim) {
+    // Two hairline rings (top + base) outline the glass in soft red.
+    const rimMat = new THREE.MeshStandardMaterial({
+      color: 0x330a0c,
+      emissive: 0xff2a3a,
+      emissiveIntensity: 1.4,
+      roughness: 0.5,
+    });
+    for (const y of [0.025, MUG_HEIGHT - 0.015]) {
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(MUG_RADIUS * 1.03, 0.006, 5, 18),
+        rimMat,
+      );
+      ring.rotation.x = Math.PI / 2;
+      ring.position.y = y;
+      group.add(ring);
+    }
+  }
+
   const mug: MugMesh = { group, liquid, foam };
   setMugFill(mug, 0);
   return mug;
 }
 
-/** Fill level 0..1: the liquid column rises, foam appears when full. */
-export function setMugFill(mug: MugMesh, level: number): void {
+export function setMugFill(mug: MugMesh, level: number, isSliding: boolean = false): void {
   const h = MUG_HEIGHT * 0.82;
   const l = Math.max(0.001, level);
   mug.liquid.scale.y = l;
@@ -84,6 +104,12 @@ export function setMugFill(mug: MugMesh, level: number): void {
   mug.liquid.visible = level > 0.02;
   mug.foam.visible = level >= 0.98;
   mug.foam.position.y = 0.03 + h + 0.02;
+
+  // Make it glow brightly only when full (destello) and not sliding
+  const isFull = level >= 0.98 && !isSliding;
+  const intensity = isFull ? 1.5 : 0.1;
+  (mug.liquid.material as THREE.MeshStandardMaterial).emissiveIntensity = intensity;
+  (mug.foam.material as THREE.MeshStandardMaterial).emissiveIntensity = isFull ? 0.8 : 0.1;
 }
 
 export function disposeMug(mug: MugMesh): void {

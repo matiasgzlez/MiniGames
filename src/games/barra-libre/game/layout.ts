@@ -6,8 +6,9 @@ import {
   PEOPLE_Z_OFFSET,
 } from "./constants";
 
-/** Terraced-lane geometry, shared by the world, the views and the Game.
- *  Lane 0 is the nearest/lowest bar; each lane steps back (+Z) and up (+Y). */
+/** Lane geometry, shared by the world, the views and the Game. Lane 0 is
+ *  the nearest bar; each lane steps back (+Z). The +Y terrace is retained as
+ *  a knob (`LANE_STEP_Y`) but is currently flat (0) — all bars share a floor. */
 
 export function laneFloorY(lane: number): number {
   return lane * LANE_STEP_Y;

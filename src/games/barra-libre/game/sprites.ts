@@ -522,32 +522,66 @@ export function buildNeonCocktail(): THREE.CanvasTexture {
   return finishTexture(canvas);
 }
 
-/** Window with the night sky and a fat moon; the cool light source. */
-export function buildMoonWindowTexture(): THREE.CanvasTexture {
-  const w = 40;
-  const h = 52;
+/** A wide city-skyline night view for the side-wall picture window: a
+ *  graded sky, a warm horizon haze and two layers of silhouetted towers
+ *  freckled with warm/cool lit windows (the bloom picks the lights up).
+ *  Drawn wide (the mullion frame is real geometry, not painted here). */
+export function buildCityWindowTexture(): THREE.CanvasTexture {
+  const w = 160;
+  const h = 88;
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext("2d")!;
-  // Frame.
-  ctx.fillStyle = "#241309";
+
+  // Night sky gradient, deep navy up top warming toward the horizon.
+  const sky = ctx.createLinearGradient(0, 0, 0, h);
+  sky.addColorStop(0, "#05060f");
+  sky.addColorStop(0.55, "#0a1024");
+  sky.addColorStop(0.82, "#1b1836");
+  sky.addColorStop(1, "#2c2032");
+  ctx.fillStyle = sky;
   ctx.fillRect(0, 0, w, h);
-  // Panes.
-  ctx.fillStyle = "#101a30";
-  ctx.fillRect(3, 3, w - 6, h - 6);
-  // Cross bars.
-  ctx.fillStyle = "#241309";
-  ctx.fillRect(w / 2 - 1, 3, 2, h - 6);
-  ctx.fillRect(3, h / 2 - 1, w - 6, 2);
-  // Moon + stars (bright: bloom picks the moon up).
-  ctx.fillStyle = "#e8ecf4";
-  ctx.fillRect(9, 9, 7, 7);
-  ctx.fillRect(8, 10, 9, 5);
-  ctx.fillStyle = "#aebadf";
-  for (const [sx, sy] of [[26, 8], [31, 14], [24, 20], [8, 30], [30, 34], [14, 42]]) {
+
+  // A scatter of stars in the upper sky.
+  ctx.fillStyle = "#cdd6f2";
+  for (const [sx, sy] of [[12, 6], [40, 10], [70, 5], [104, 9], [138, 7], [150, 14], [24, 16], [88, 12]]) {
     ctx.fillRect(sx, sy, 1, 1);
   }
+
+  // Warm haze glow rising behind the skyline.
+  const haze = ctx.createLinearGradient(0, h * 0.5, 0, h);
+  haze.addColorStop(0, "rgba(150,90,90,0)");
+  haze.addColorStop(1, "rgba(210,120,90,0.35)");
+  ctx.fillStyle = haze;
+  ctx.fillRect(0, Math.floor(h * 0.5), w, h);
+
+  const warm = "#ffd98a";
+  const cool = "#cfe8ff";
+  const drawTowers = (startX: number, body: string, minW: number, varW: number, baseTop: number, spread: number, lit: number): void => {
+    let x = startX;
+    while (x < w) {
+      const bw = minW + Math.floor(Math.random() * varW);
+      const top = Math.floor(h * (baseTop + Math.random() * spread));
+      ctx.fillStyle = body;
+      ctx.fillRect(x, top, bw, h - top);
+      // Grid of lit windows.
+      for (let wy = top + 2; wy < h - 2; wy += 3) {
+        for (let wx = x + 1; wx < x + bw - 1; wx += 2) {
+          if (Math.random() < lit) {
+            ctx.fillStyle = Math.random() < 0.76 ? warm : cool;
+            ctx.fillRect(wx, wy, 1, 2);
+          }
+        }
+      }
+      x += bw + 1 + Math.floor(Math.random() * 3);
+    }
+  };
+
+  // Far, hazier layer then a nearer, taller silhouette layer in front.
+  drawTowers(-2, "#1a2138", 8, 10, 0.44, 0.18, 0.34);
+  drawTowers(-4, "#0a0e1e", 12, 16, 0.22, 0.28, 0.52);
+
   return finishTexture(canvas);
 }
 
@@ -610,34 +644,6 @@ export function buildBoothTexture(drinkers: Drinker[], frame: number): THREE.Can
       ctx.fillRect(d.x + 5, h - 13, 2, 3);
     }
   }
-  return finishTexture(canvas);
-}
-
-/** Jukebox face: dark body with bright arch bands (map + emissiveMap so
- *  the bands glow and catch the bloom). */
-export function buildJukeboxTexture(): THREE.CanvasTexture {
-  const w = 32;
-  const h = 48;
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext("2d")!;
-  ctx.fillStyle = "#3a1622";
-  ctx.fillRect(0, 0, w, h);
-  // Arch bands.
-  const bands = ["#ff9d3d", "#3dd9ff", "#ff3d7a"];
-  bands.forEach((c, i) => {
-    const inset = 3 + i * 4;
-    ctx.fillStyle = c;
-    ctx.fillRect(inset, inset, w - inset * 2, 3);
-    ctx.fillRect(inset, inset, 3, h - inset - 4);
-    ctx.fillRect(w - inset - 3, inset, 3, h - inset - 4);
-  });
-  // Grille and slot.
-  ctx.fillStyle = "#1c0b12";
-  ctx.fillRect(9, 24, 14, 16);
-  ctx.fillStyle = "#d0c05f";
-  ctx.fillRect(11, 20, 10, 2);
   return finishTexture(canvas);
 }
 

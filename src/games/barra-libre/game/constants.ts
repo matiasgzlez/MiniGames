@@ -7,13 +7,15 @@
  *  (the bartender's end); served mugs slide toward -X. */
 
 // --- Camera ---
-export const CAM_FOV = 50;
-export const CAM_POS_Y = 4.6;
-export const CAM_POS_Z = -6.0;
-export const CAM_LOOK_Y = 2.5;
-export const CAM_LOOK_Z = 5.0;
+export const CAM_FOV = 55;
+export const CAM_POS_X = -5.0;
+export const CAM_POS_Y = 5.6;
+export const CAM_POS_Z = -7.4;
+export const CAM_LOOK_X = -0.6;
+export const CAM_LOOK_Y = 2.0;
+export const CAM_LOOK_Z = 5.2;
 /** Parallax: how much the camera rises with the bartender's lane. */
-export const CAM_FOLLOW_Y = 0.22;
+export const CAM_FOLLOW_Y = 0.0;
 export const CAM_LERP = 6;
 
 // --- Retro post-processing ---
@@ -30,27 +32,27 @@ export const LANE_COUNT = 4;
 export const LANE_BASE_Z = 2.0;
 export const LANE_STEP_Z = 2.4;
 /** Terraced floors: each lane's floor rises so all four bars read. */
-export const LANE_STEP_Y = 1.05;
+export const LANE_STEP_Y = 0.0;
 /** Counter top height above its lane's floor. Lower than a real bar on
  *  purpose: the customers' torsos must read above the wood. */
 export const COUNTER_HEIGHT = 0.88;
 /** Counter slab size. */
-export const COUNTER_LENGTH = 8.2;
+export const COUNTER_LENGTH = 15.2;
 export const COUNTER_DEPTH = 0.9;
 /** People (customers, bartender) stand this far behind the counter line. */
 export const PEOPLE_Z_OFFSET = 0.62;
 
 /** Customers appear here... */
-export const SPAWN_X = -4.0;
+export const SPAWN_X = -9.0;
 /** ...and a full mug that reaches this X with nobody to catch it crashes. */
-export const CRASH_X = -4.2;
+export const CRASH_X = -9.2;
 /** A customer who reaches this X grabs the bartender: strike. */
-export const END_X = 2.55;
+export const END_X = 4.55;
 /** Empty mugs / tips are catchable from here; past it they fall. */
-export const CATCH_X = 2.45;
+export const CATCH_X = 4.45;
 /** The tap (and the bartender) sit here, past the end of the counter. */
-export const TAP_X = 3.05;
-export const BARTENDER_X = 3.15;
+export const TAP_X = 5.05;
+export const BARTENDER_X = 5.15;
 
 // --- Bartender ---
 /** Seconds to hop between adjacent lanes (locked while pouring). */
@@ -102,10 +104,13 @@ export const POINTS_TIP = 25;
 // Lanes.paramsAt from the elapsed play time (no levels — the night just
 // gets worse). Tuned by playing, not by simulation:
 //
-//   A. Warmup      — two lanes, slow strollers, generous gaps.
-//   B. Ritmo       — until RITMO_END_S: spawns speed up, lanes open up.
+//   A. Warmup      — all four bars, slow strollers, generous gaps.
+//   B. Ritmo       — until RITMO_END_S: spawns speed up.
 //   C. Mezcla      — until INFERNO_START_S: punks and groups ramp in.
-//   D. Inferno     — everything maxed (blended over INFERNO_BLEND_S). ---
+//   D. Inferno     — everything maxed (blended over INFERNO_BLEND_S).
+//
+// Spawns always target the emptiest bar with room (Lanes.pickLane), so the
+// customers spread across all four instead of piling onto one or two. ---
 
 export const WARMUP_END_S = 15;
 export const RITMO_END_S = 60;
@@ -115,24 +120,20 @@ export const INFERNO_BLEND_S = 10;
 export const FIRST_SPAWN_DELAY = 1.0;
 
 /** A. Warmup. */
-export const WARMUP_INTERVAL = 2.5;
+export const WARMUP_INTERVAL = 4.5;
 export const WARMUP_SPEED = 0.55;
-export const WARMUP_LANES = 2;
 
-/** B. Ritmo (values at WARMUP_END_S -> at RITMO_END_S). Extra lanes open
- *  at fixed times inside the phase. */
-export const RITMO_INTERVAL_START = 2.2;
-export const RITMO_INTERVAL_END = 1.4;
+/** B. Ritmo (values at WARMUP_END_S -> at RITMO_END_S). */
+export const RITMO_INTERVAL_START = 3.6;
+export const RITMO_INTERVAL_END = 2.0;
 export const RITMO_SPEED_START = 0.55;
 export const RITMO_SPEED_END = 0.75;
-export const THIRD_LANE_AT_S = 25;
-export const FOURTH_LANE_AT_S = 40;
 export const RITMO_PUNK_END = 0.15;
 export const RITMO_GROUP_END = 0.15;
 
 /** C. Mezcla (values at RITMO_END_S -> at INFERNO_START_S). */
-export const MIX_INTERVAL_START = 1.4;
-export const MIX_INTERVAL_END = 1.0;
+export const MIX_INTERVAL_START = 2.0;
+export const MIX_INTERVAL_END = 1.4;
 export const MIX_SPEED_START = 0.75;
 export const MIX_SPEED_END = 0.95;
 export const MIX_PUNK_START = 0.15;
@@ -141,7 +142,7 @@ export const MIX_GROUP_START = 0.15;
 export const MIX_GROUP_END = 0.3;
 
 /** D. Inferno. */
-export const INFERNO_INTERVAL = 0.85;
+export const INFERNO_INTERVAL = 1.2;
 export const INFERNO_SPEED = 1.05;
 export const INFERNO_PUNK = 0.4;
 export const INFERNO_GROUP = 0.35;
@@ -149,7 +150,7 @@ export const INFERNO_GROUP = 0.35;
 // --- Rules ---
 /** Strikes before the night ends: customer reaches the tap, an empty mug
  *  falls uncaught, or a beer crashes at the far end with nobody there. */
-export const MAX_MISSES = 3;
+export const MAX_MISSES = 6;
 
 /** Max simulated dt per frame (s) so a hitch can't teleport mugs. */
 export const MAX_DT = 0.05;

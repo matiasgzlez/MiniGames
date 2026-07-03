@@ -14,8 +14,7 @@ import {
   buildCounterTopTexture,
   buildDrinkers,
   buildFloorTexture,
-  buildJukeboxTexture,
-  buildMoonWindowTexture,
+  buildCityWindowTexture,
   buildNeonBarSign,
   buildNeonCocktail,
   buildShelfTexture,
@@ -25,14 +24,19 @@ import {
 const BOOTH_FRAME_TIME = 0.7;
 /** Counters are centered so they span SPAWN side to just past the tap. */
 const COUNTER_CENTER_X = TAP_X + 0.55 - COUNTER_LENGTH / 2;
+/** The two lamp rows per lane: one over the walk-in, one by the serve end. */
+const LAMP_SPAWN_X = -5.5;
+const LAMP_TAP_X = 2.8;
+/** The +X side wall (screen left): a floor-to-ceiling city picture window. */
+const SIDE_WALL_X = 7.5;
 
 const BACK_WALL_Z = 11.4;
 const ROOM_WIDTH = 15;
 
-/** The night bar: terraced floors, four counters with taps, the back wall
- *  with its backlit bottle shelves, neon signs, moon window, booth crowd
- *  and jukebox — plus the whole light rig. The visible fixtures (lamps,
- *  neon tubes, bottle backlight, jukebox arch, moon) are emissive meshes
+/** The night bar: a single flat floor, four counters with taps, the back
+ *  wall with its backlit bottle shelves, neon signs, booth crowd and a city
+ *  window on the side wall — plus the whole light rig. The visible fixtures
+ *  (lamps, neon tubes, bottle backlight, city window) are emissive meshes
  *  co-located with real lights so what the eye sees is what casts. */
 export class Barroom {
   readonly object = new THREE.Group();
@@ -53,9 +57,15 @@ export class Barroom {
   private flickerLeft = 0;
   private flickerCooldown = 2;
 
-  /** Jukebox glow slowly cycles its hue. */
-  private readonly jukeLight: THREE.PointLight;
-  private jukeHue = 0;
+  /** Shared furniture palette (red-wine upholstery, dark metal frame, wood
+   *  top) so the lounge tables and chairs read as one set. */
+  private readonly stoolSeatMat = new THREE.MeshStandardMaterial({ color: 0x7a2030, roughness: 0.6 });
+  private readonly stoolLegMat = new THREE.MeshStandardMaterial({
+    color: 0x3a3540,
+    roughness: 0.4,
+    metalness: 0.5,
+  });
+  private readonly tableWoodMat = new THREE.MeshStandardMaterial({ color: 0x2e1a0f, roughness: 0.8 });
 
   constructor() {
     const drinkers = buildDrinkers(256);
@@ -63,9 +73,9 @@ export class Barroom {
 
     this.object.add(this.buildFloors());
     this.object.add(this.buildCounters());
+    this.object.add(this.buildLounge());
     this.object.add(this.buildBackWall());
     this.neonLight = this.buildNeons();
-    this.jukeLight = this.buildJukebox();
     this.buildLamps();
     this.buildBaseLights();
 
@@ -95,15 +105,17 @@ export class Barroom {
       const zFrom = laneZ(lane) - 0.9;
       const zTo = laneZ(lane) + 1.7;
       const h = laneFloorY(lane);
-      const slab = new THREE.Mesh(new THREE.BoxGeometry(ROOM_WIDTH, h, zTo - zFrom), riserMat);
-      slab.position.set(0, h / 2, (zFrom + zTo) / 2);
-      slab.receiveShadow = true;
-      group.add(slab);
-      const top = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_WIDTH, zTo - zFrom), floorMat);
-      top.rotation.x = -Math.PI / 2;
-      top.position.set(0, h + 0.005, (zFrom + zTo) / 2);
-      top.receiveShadow = true;
-      group.add(top);
+      if (h > 0.01) {
+        const slab = new THREE.Mesh(new THREE.BoxGeometry(ROOM_WIDTH, h, zTo - zFrom), riserMat);
+        slab.position.set(0, h / 2, (zFrom + zTo) / 2);
+        slab.receiveShadow = true;
+        group.add(slab);
+        const top = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_WIDTH, zTo - zFrom), floorMat);
+        top.rotation.x = -Math.PI / 2;
+        top.position.set(0, h + 0.005, (zFrom + zTo) / 2);
+        top.receiveShadow = true;
+        group.add(top);
+      }
     }
     return group;
   }
@@ -168,21 +180,73 @@ export class Barroom {
       group.add(handle);
     }
 
-    // A few stools in front of the nearest counter dress the foreground.
-    const seatMat = new THREE.MeshStandardMaterial({ color: 0x7a2030, roughness: 0.6 });
-    const legMat = new THREE.MeshStandardMaterial({ color: 0x3a3540, roughness: 0.4, metalness: 0.5 });
-    for (const x of [-3.2, -1.1, 1.0]) {
-      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.06, 0.62, 8), legMat);
-      leg.position.set(x, 0.31, laneZ(0) - 0.85);
-      leg.castShadow = true;
-      group.add(leg);
-      const seat = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.08, 10), seatMat);
-      seat.position.set(x, 0.66, laneZ(0) - 0.85);
-      seat.castShadow = true;
-      group.add(seat);
+    return group;
+  }
+
+  /** Bistro/restaurant sets that dress the empty floor in front of the bar:
+   *  a round pedestal table with two backed chairs, angled a little so the
+   *  foreground reads as a room, not a row. */
+  private buildLounge(): THREE.Group {
+    const group = new THREE.Group();
+    const sets: [number, number, number][] = [
+      [-4.8, 0.05, 0.35],
+      [-1.7, -0.15, -0.25],
+      [1.6, 0.05, 0.5],
+    ];
+    for (const [x, z, rot] of sets) group.add(this.makeDinerSet(x, z, rot));
+    return group;
+  }
+
+  /** A round restaurant table (dark pedestal + wood top) with a backed chair
+   *  on either side facing in. */
+  private makeDinerSet(x: number, z: number, rotY: number): THREE.Group {
+    const set = new THREE.Group();
+
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.3, 0.05, 12), this.stoolLegMat);
+    base.position.y = 0.025;
+    set.add(base);
+    const column = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.66, 8), this.stoolLegMat);
+    column.position.y = 0.36;
+    set.add(column);
+    const top = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 0.05, 20), this.tableWoodMat);
+    top.position.y = 0.72;
+    top.castShadow = true;
+    top.receiveShadow = true;
+    set.add(top);
+
+    for (const dir of [-1, 1]) {
+      const chair = this.makeChair();
+      chair.position.z = dir * 0.62;
+      chair.rotation.y = dir < 0 ? 0 : Math.PI; // face the table
+      set.add(chair);
     }
 
-    return group;
+    set.position.set(x, 0, z);
+    set.rotation.y = rotY;
+    return set;
+  }
+
+  /** A chair facing +Z: four legs, a padded seat and a backrest at the -Z
+   *  side. Same palette as the bar (red-wine seat, dark metal frame). */
+  private makeChair(): THREE.Group {
+    const chair = new THREE.Group();
+    for (const lx of [-0.15, 0.15]) {
+      for (const lz of [-0.15, 0.15]) {
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.44, 6), this.stoolLegMat);
+        leg.position.set(lx, 0.22, lz);
+        leg.castShadow = true;
+        chair.add(leg);
+      }
+    }
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.06, 0.36), this.stoolSeatMat);
+    seat.position.y = 0.46;
+    seat.castShadow = true;
+    chair.add(seat);
+    const back = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.4, 0.05), this.stoolSeatMat);
+    back.position.set(0, 0.67, -0.16);
+    back.castShadow = true;
+    chair.add(back);
+    return chair;
   }
 
   private buildBackWall(): THREE.Group {
@@ -227,20 +291,50 @@ export class Barroom {
     booth.rotation.y = Math.PI;
     group.add(booth);
 
-    // Moon window on the left side wall: the cool light gets a source.
-    const windowMesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(1.7, 2.2),
+    group.add(this.buildCityWindow());
+
+    return group;
+  }
+
+  /** Floor-to-ceiling picture window on the +X side wall: the emissive city
+   *  view (the cool light's source) behind a real dark mullion frame. */
+  private buildCityWindow(): THREE.Group {
+    const group = new THREE.Group();
+
+    const cityTex = buildCityWindowTexture();
+    const glass = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 6.5),
       new THREE.MeshStandardMaterial({
-        map: buildMoonWindowTexture(),
+        map: cityTex,
         emissive: 0xffffff,
-        emissiveMap: buildMoonWindowTexture(),
-        emissiveIntensity: 0.85,
+        emissiveMap: cityTex,
+        emissiveIntensity: 0.6,
         roughness: 0.9,
       }),
     );
-    windowMesh.position.set(-7.2, 4.6, 6.0);
-    windowMesh.rotation.y = Math.PI / 2;
-    group.add(windowMesh);
+    glass.position.set(SIDE_WALL_X, 3.25, 5.0);
+    glass.rotation.y = -Math.PI / 2;
+    group.add(glass);
+
+    // Dark frame + mullions, sitting just in front of the glass (-X side).
+    const frameMat = new THREE.MeshStandardMaterial({ color: 0x14100c, roughness: 0.7, metalness: 0.3 });
+    const fx = SIDE_WALL_X - 0.04;
+    const addBar = (len: number, along: "z" | "y", y: number, z: number): void => {
+      const geo = along === "z"
+        ? new THREE.BoxGeometry(0.05, 0.08, len)
+        : new THREE.BoxGeometry(0.05, len, 0.08);
+      const bar = new THREE.Mesh(geo, frameMat);
+      bar.position.set(fx, y, z);
+      group.add(bar);
+    };
+    // Outer frame.
+    addBar(12, "z", 6.45, 5.0);
+    addBar(12, "z", 0.05, 5.0);
+    addBar(6.5, "y", 3.25, -0.95);
+    addBar(6.5, "y", 3.25, 10.95);
+    // Inner mullions.
+    for (const z of [1.6, 5.0, 8.4]) addBar(6.5, "y", 3.25, z);
+    addBar(12, "z", 3.25, 5.0);
 
     return group;
   }
@@ -291,35 +385,10 @@ export class Barroom {
     return magenta;
   }
 
-  private buildJukebox(): THREE.PointLight {
-    const tex = buildJukeboxTexture();
-    const faceMat = new THREE.MeshStandardMaterial({
-      map: tex,
-      emissive: 0xffffff,
-      emissiveMap: tex,
-      emissiveIntensity: 0.5,
-      roughness: 0.7,
-    });
-    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x2a0e18, roughness: 0.7 });
-    // Face toward the room (+X side visible from the camera angle).
-    const juke = new THREE.Mesh(
-      new THREE.BoxGeometry(0.55, 1.5, 0.95),
-      [faceMat, bodyMat, bodyMat, bodyMat, bodyMat, bodyMat],
-    );
-    juke.position.set(-6.1, 0.75, 1.2);
-    juke.rotation.y = -0.35;
-    juke.castShadow = true;
-    this.object.add(juke);
-
-    const light = new THREE.PointLight(0xff9d3d, 4, 6, 1.8);
-    light.position.set(-5.4, 1.6, 1.4);
-    this.object.add(light);
-    return light;
-  }
-
-  /** One hanging lamp per counter: cone shade, glowing bulb, warm spot.
-   *  Two of the four cast shadows (budget); the light rig still reads as
-   *  four pools of lamplight on the wood. */
+  /** Two hanging lamps per counter: one out over the customers' walk-in
+   *  (spawn side), one near the bartender's serve end. Cone shade, glowing
+   *  bulb, warm spot. Only the spawn-side lamps of lanes 0 and 2 cast
+   *  shadows (budget); the rig still reads as pools of lamplight on the wood. */
   private buildLamps(): void {
     const shadeMat = new THREE.MeshStandardMaterial({
       color: 0x1d3a2a,
@@ -334,13 +403,12 @@ export class Barroom {
       roughness: 0.4,
     });
 
-    for (let lane = 0; lane < LANE_COUNT; lane++) {
-      const x = COUNTER_CENTER_X;
+    const addLamp = (x: number, lane: number, castShadow: boolean): void => {
       const y = laneCounterTopY(lane) + 2.1;
       const z = laneZ(lane);
 
-      const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 1.6, 4), cordMat);
-      cord.position.set(x, y + 0.9, z);
+      const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 6.0, 4), cordMat);
+      cord.position.set(x, y + 3.1, z);
       this.object.add(cord);
 
       const shade = new THREE.Mesh(
@@ -356,10 +424,10 @@ export class Barroom {
 
       // Aimed a touch behind the counter so the cone also catches the
       // customers walking there, not just the wood.
-      const spot = new THREE.SpotLight(0xffb45c, 30, 9, 0.7, 0.55, 1.2);
+      const spot = new THREE.SpotLight(0xffb45c, 26, 9, 0.7, 0.55, 1.2);
       spot.position.set(x, y, z);
       spot.target.position.set(x, laneCounterTopY(lane), z + 0.35);
-      if (lane === 0 || lane === 2) {
+      if (castShadow) {
         spot.castShadow = true;
         spot.shadow.mapSize.set(1024, 1024);
         spot.shadow.camera.near = 0.5;
@@ -368,6 +436,11 @@ export class Barroom {
         spot.shadow.normalBias = 0.03;
       }
       this.object.add(spot, spot.target);
+    };
+
+    for (let lane = 0; lane < LANE_COUNT; lane++) {
+      addLamp(LAMP_SPAWN_X, lane, lane === 0 || lane === 2);
+      addLamp(LAMP_TAP_X, lane, false);
     }
   }
 
@@ -381,15 +454,34 @@ export class Barroom {
     rim.target.position.set(2, 1, 6);
     this.object.add(rim, rim.target);
 
+    // Warm key from the camera side to light the sprites' faces and balance
+    // the cool window/rim so patrons don't read as flat silhouettes.
+    const frontWarm = new THREE.DirectionalLight(0xffa868, 0.45);
+    frontWarm.position.set(6, 4.5, -2);
+    frontWarm.target.position.set(-1, 0.5, 5);
+    this.object.add(frontWarm, frontWarm.target);
+
     // Warm wash over the tap end of all four bars (the lamps pool at the
     // counters' center, so the bartender's corner needs its own glow —
     // visually it reads as spill from the backbar shelves).
     const tapGlow = new THREE.PointLight(0xffb454, 7, 9, 1.7);
     tapGlow.position.set(3.4, 3.1, 5.6);
     this.object.add(tapGlow);
+
+    // Fill over the -X spawn end (screen right) so customers walking in from
+    // off-camera aren't lost in the dark before they reach the lamplight.
+    const spawnFill = new THREE.PointLight(0x8a2be2, 5, 12, 1.5);
+    spawnFill.position.set(-6.5, 4.0, 4.0);
+    this.object.add(spawnFill);
+
+    // Soft warm glow over the front lounge so the tables read in the dark
+    // foreground without washing the play area behind them.
+    const loungeGlow = new THREE.PointLight(0xffa050, 3.2, 7, 1.8);
+    loungeGlow.position.set(-1.5, 1.7, -0.2);
+    this.object.add(loungeGlow);
   }
 
-  /** Booth crowd swap, neon flicker and the jukebox hue cycle. */
+  /** Booth crowd swap and the tired-tube neon flicker. */
   update(dt: number): void {
     this.boothTime += dt;
     if (this.boothTime >= BOOTH_FRAME_TIME) {
@@ -414,9 +506,5 @@ export class Barroom {
       this.flickerCooldown -= dt;
       if (this.flickerCooldown <= 0) this.flickerLeft = 0.1 + Math.random() * 0.15;
     }
-
-    // Jukebox glow drifts through the hues.
-    this.jukeHue = (this.jukeHue + dt * 0.07) % 1;
-    this.jukeLight.color.setHSL(this.jukeHue, 0.85, 0.6);
   }
 }
