@@ -38,6 +38,7 @@ export const GAME_SCORING: Record<string, GameScoring> = {
   "dunk-shot": { direction: "higher" },
   "odd-one-out": { direction: "higher" },
   "penalty-keeper": { direction: "higher" },
+  "barra-libre": { direction: "higher" },
   "memory-match": {
     // Base "higher" (pares) para el modo sala. El modo solo usa un unico
     // ranking "lower" (variante "solo") que codifica tiempo + movimientos en un

@@ -163,12 +163,12 @@ export const games: GameEntry[] = [
     category: "Precisión",
   },
   {
-    id: "blind-time",
-    title: "Crono Ciego",
-    description: "Detén el cronómetro a ciegas lo más cerca posible del tiempo objetivo asignado.",
-    path: "/games/blind-time/",
-    accent: "#ffdd53",
-    category: "Precisión",
+    id: "barra-libre",
+    title: "Barra Libre",
+    description: "Atiende las cuatro barras del bar: llena jarras, sírvelas deslizando y ataja los vasos vacíos antes de que un cliente llegue a la canilla.",
+    path: "/games/barra-libre/",
+    accent: "#ffb454",
+    category: "Arcade",
   },
   {
     id: "shell-game",
