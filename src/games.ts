@@ -162,10 +162,18 @@ export const games: GameEntry[] = [
   {
     id: "shell-game",
     title: "El Trile",
-    description: "Sigue con la mirada el vaso que oculta la moneda. ¡Cada nivel mezcla más rápido, hace más pases y agrega más vasos!",
+    description: "Sigue con la mirada el vaso que oculta la moneda. !Cada nivel mezcla mas rapido, hace mas pases y agrega mas vasos!",
     path: "/games/shell-game/",
     accent: "#ffdd53",
     category: "Reflejos",
+  },
+  {
+    id: "pong",
+    title: "PONG",
+    description: "Pong clasico de un solo jugador: devuelve la pelota con tu paleta, la velocidad aumenta y solo tenes una vida.",
+    path: "/games/pong/",
+    accent: "#ffffff",
+    category: "Arcade",
   },
 ];
 
