@@ -78,6 +78,7 @@ export const GAME_SCORING: Record<string, GameScoring> = {
     direction: "higher",
     format: (n) => `Nivel ${n}`,
   },
+  "pong": { direction: "higher" },
 };
 
 /**
