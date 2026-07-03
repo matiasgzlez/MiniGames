@@ -122,16 +122,17 @@ a {
   gap: 20px;
 }
 
-/* Lobby del host mas ancho para las dos columnas. */
+/* Lobby del host: aprovecha casi todo el ancho de pantalla para las dos columnas. */
 .rooms--wide {
-  max-width: 1040px;
+  max-width: min(1400px, 95vw);
 }
 
-/* Lobby en dos columnas: ajustes (izquierda) + codigo/jugadores (derecha). */
+/* Lobby en dos columnas: ajustes (izquierda, mas ancha para la grilla de juegos)
+   + codigo/jugadores (derecha). */
 .lobby__columns {
   display: grid;
-  grid-template-columns: 1.6fr 1fr;
-  gap: 20px;
+  grid-template-columns: 1.9fr 1fr;
+  gap: 28px;
   align-items: start;
 }
 
