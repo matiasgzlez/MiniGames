@@ -6,6 +6,7 @@ export class Hud {
   private readonly bestEl: HTMLDivElement;
   private readonly livesEl: HTMLDivElement;
   private readonly levelEl: HTMLDivElement;
+  private readonly timerEl: HTMLDivElement;
   private readonly overlayEl: HTMLDivElement;
   private readonly titleEl: HTMLDivElement;
   private readonly subtitleEl: HTMLDivElement;
@@ -37,7 +38,10 @@ export class Hud {
     this.levelEl = document.createElement("div");
     this.levelEl.className = "hud__level";
 
-    hud.append(this.scoreEl, this.bestEl, this.livesEl, this.levelEl);
+    this.timerEl = document.createElement("div");
+    this.timerEl.className = "hud__timer";
+
+    hud.append(this.scoreEl, this.bestEl, this.timerEl, this.livesEl, this.levelEl);
 
     this.overlayEl = document.createElement("div");
     this.overlayEl.className = "overlay";
@@ -145,11 +149,21 @@ export class Hud {
   }
 
   setLives(lives: number): void {
+    // En modo sala no hay vidas (se pasa -1): se oculta el indicador.
+    if (lives < 0) {
+      this.livesEl.textContent = "";
+      return;
+    }
     let stars = "";
     for (let i = 0; i < INITIAL_LIVES; i++) {
       stars += i < lives ? "⭐" : "💀";
     }
     this.livesEl.textContent = stars;
+  }
+
+  /** Muestra el tiempo restante de la ronda a tiempo (modo sala); null lo oculta. */
+  setTimer(seconds: number | null): void {
+    this.timerEl.textContent = seconds === null ? "" : `TIEMPO ${Math.ceil(seconds)}s`;
   }
 
   setLevel(level: number): void {

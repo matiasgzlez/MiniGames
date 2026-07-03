@@ -11,6 +11,13 @@ export const MAX_DT = 0.1;
 
 export const LIVES_START = 1;
 
+/**
+ * Half-width of the frog's collision hitbox, in pixels. The visible body is a
+ * circle of radius ~10 centred in the 40px cell; a slightly smaller hitbox makes
+ * near-misses survivable (die only on a real visual overlap) instead of punishing.
+ */
+export const FROG_HITBOX_HALF = 9;
+
 export interface LaneData {
   row: number;
   type: "grass" | "road" | "river";

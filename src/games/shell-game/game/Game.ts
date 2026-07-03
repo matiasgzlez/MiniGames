@@ -119,27 +119,21 @@ export class Game {
     this.selectedCupIndex = null;
     this.localChoiceSubmitted = false;
 
-    if (this.room) {
-      // In room mode the Battle Royale level is tracked independently of the
-      // room's playlist round (see data.level). Keep the last known level for
-      // the HUD; playShufflingSequence corrects it from the shared match state.
-      this.hud.updateStats(this.level);
+    // The countdown 3-2-1-YA only runs when the game starts (level 1), in both
+    // solo and room mode. Subsequent levels/rounds (including each Battle Royale
+    // level in a sala) skip straight to shuffling. In room mode the level is
+    // tracked independently of the playlist round (see data.level); it is synced
+    // to the new level before startRound runs, and playShufflingSequence
+    // re-confirms it from the shared match state.
+    this.hud.updateStats(this.level);
+    if (this.level === 1) {
       this.state = "countdown";
       this.countdownTime = 0;
       this.lastCountdownIndex = -1;
       this.hud.showCountdown(COUNTDOWN_LABELS[0]);
     } else {
-      this.hud.updateStats(this.level);
-      if (this.level === 1) {
-        // Only run countdown on level 1
-        this.state = "countdown";
-        this.countdownTime = 0;
-        this.lastCountdownIndex = -1;
-        this.hud.showCountdown(COUNTDOWN_LABELS[0]);
-      } else {
-        // Skip countdown for subsequent levels and start shuffling
-        this.playShufflingSequence();
-      }
+      // Skip countdown for subsequent levels and start shuffling
+      this.playShufflingSequence();
     }
   }
 
@@ -182,8 +176,10 @@ export class Game {
     const cupsCount = this.cups.length;
     const coin = this.hud.coin;
     coin.classList.remove("hidden");
-    // Align coin center with cup center in slot
-    coin.style.left = `calc(${slot} * (100% - var(--cup-width)) / ${cupsCount - 1} + (var(--cup-width) - var(--coin-size)) / 2)`;
+    // Align the coin center with the cup center: point `left` at the cup center
+    // and let the `.coin` rule's translateX(-50%) do the centering. (Subtracting
+    // half the coin width here as well would double-center and shift it sideways.)
+    coin.style.left = `calc(${slot} * (100% - var(--cup-width)) / ${cupsCount - 1} + var(--cup-width) / 2)`;
   }
 
   private async animateRevealCoin(): Promise<void> {

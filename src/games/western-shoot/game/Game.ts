@@ -6,6 +6,7 @@ import {
   CIVILIAN_PENALTY,
   MISS_PENALTY,
   MAX_DT,
+  ROOM_ROUND_SEC,
   VIEW_HEIGHT,
   VIEW_WIDTH,
 } from "./constants";
@@ -14,6 +15,7 @@ import { Crosshair } from "./Crosshair";
 import { Hud } from "./Hud";
 import { Spawner } from "./Spawner";
 import { SoundEffects } from "./SoundEffects";
+import { initRoomMode, type RoomMode } from "../../../shared/room/roomMode";
 
 type State = "ready" | "countdown" | "playing" | "gameover";
 
@@ -32,6 +34,11 @@ export class Game {
 
   private countdownTime = 0;
   private lastTime = 0;
+
+  // ── Modo sala (multijugador): activo solo con ?room= en la URL ────
+  private readonly room: RoomMode | null;
+  /** Cuenta atras de la ronda a tiempo en modo sala (segundos). */
+  private roomTimer = 0;
 
   // ── Screen-shake on hit taken ─────────────────────────────────────
   private shakeTimer = 0;
@@ -55,6 +62,11 @@ export class Game {
     this.hud.setLives(INITIAL_LIVES);
     this.hud.showStart();
     this.hud.mountPopupCanvas(this.canvas);
+
+    this.room = initRoomMode("western-shoot", {
+      getScore: () => this.score,
+      onStart: () => this.beginCountdown(),
+    });
 
     this.canvas.addEventListener("pointerdown", this.handlePointer);
     window.addEventListener("keydown", this.handleKeyDown);
@@ -101,6 +113,9 @@ export class Game {
   };
 
   private onPrimary(): void {
+    // En modo sala el inicio lo dispara RoomMode (onStart) y no hay reintento:
+    // una sola partida por ronda.
+    if (this.room) return;
     if (this.state === "ready" || this.state === "gameover") {
       this.beginCountdown();
     }
@@ -117,9 +132,18 @@ export class Game {
     this.damageFlash = 0;
 
     this.hud.setScore(0);
-    this.hud.setLives(INITIAL_LIVES);
     this.hud.setLevel(0);
     this.hud.hide();
+
+    if (this.room) {
+      // Ronda a tiempo: sin vidas, gana quien mas puntos hace en 1 minuto.
+      this.roomTimer = ROOM_ROUND_SEC;
+      this.hud.setLives(-1);
+      this.hud.setTimer(ROOM_ROUND_SEC);
+    } else {
+      this.hud.setLives(INITIAL_LIVES);
+      this.hud.setTimer(null);
+    }
 
     this.countdownTime = COUNTDOWN_LABELS.length * COUNTDOWN_STEP;
   }
@@ -183,12 +207,17 @@ export class Game {
   }
 
   private takeDamage(): void {
-    this.lives--;
-    this.hud.setLives(this.lives);
     this.shakeTimer = 0.3;
     this.shakeIntensity = 8;
     this.damageFlash = 0.4;
     SoundEffects.playEnemyShoot();
+
+    // En salas la ronda es a tiempo: el disparo enemigo sacude la pantalla pero
+    // no quita vidas ni termina la partida (dura 1 minuto fijo).
+    if (this.room) return;
+
+    this.lives--;
+    this.hud.setLives(this.lives);
 
     if (this.lives <= 0) {
       this.gameOver();
@@ -204,7 +233,8 @@ export class Game {
     }
     SoundEffects.playGameOver();
     this.hud.showGameOver(this.score, this.best);
-    this.hud.showRanking("western-shoot", this.score);
+    if (this.room) this.room.reportScore(this.score);
+    else this.hud.showRanking("western-shoot", this.score);
   }
 
   // ── Game loop ─────────────────────────────────────────────────────
@@ -241,6 +271,16 @@ export class Game {
     }
 
     if (this.state === "playing") {
+      // Ronda a tiempo en modo sala: al agotarse el minuto termina la partida.
+      if (this.room) {
+        this.roomTimer -= dt;
+        this.hud.setTimer(Math.max(0, this.roomTimer));
+        if (this.roomTimer <= 0) {
+          this.gameOver();
+          return;
+        }
+      }
+
       const prevLevel = this.spawner.level;
       this.spawner.update(dt);
 

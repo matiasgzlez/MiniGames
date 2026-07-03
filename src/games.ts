@@ -112,6 +112,14 @@ export const games: GameEntry[] = [
     category: "Reflejos",
   },
   {
+    id: "dunk-shot",
+    title: "Dunk Shot",
+    description: "Estira, apunta y encesta la pelota en el aro siguiente encadenando canastas perfectas.",
+    path: "/games/dunk-shot/",
+    accent: "#ff7a45",
+    category: "Precisión",
+  },
+  {
     id: "memory-match",
     title: "Memoria",
     description: "Encuentra los pares dando vuelta las cartas: contrarreloj en solitario, y por turnos sobre un tablero compartido en las salas.",
@@ -135,14 +143,17 @@ export const games: GameEntry[] = [
     accent: "#38e07b",
     category: "Reflejos",
   },
-  {
-    id: "rocket-arena",
-    title: "Rocket SpaceX",
-    description: "Fútbol de autos en 3D estilo Rocket League: 2v2 con bots, o en salas con los autos de todos en vivo.",
-    path: "/games/rocket-arena/",
-    accent: "#3ba7ff",
-    category: "Carreras",
-  },
+  // Oculto temporalmente por errores: no aparece en la landing ni en las salas
+  // (votacion / juego aleatorio). El codigo del juego sigue en el repo; para
+  // reactivarlo, descomentar esta entrada.
+  // {
+  //   id: "rocket-arena",
+  //   title: "Rocket SpaceX",
+  //   description: "Fútbol de autos en 3D estilo Rocket League: 2v2 con bots, o en salas con los autos de todos en vivo.",
+  //   path: "/games/rocket-arena/",
+  //   accent: "#3ba7ff",
+  //   category: "Carreras",
+  // },
   {
     id: "western-shoot",
     title: "Western Shoot",
@@ -162,10 +173,26 @@ export const games: GameEntry[] = [
   {
     id: "shell-game",
     title: "El Trile",
-    description: "Sigue con la mirada el vaso que oculta la moneda. ¡Cada nivel mezcla más rápido, hace más pases y agrega más vasos!",
+    description: "Sigue con la mirada el vaso que oculta la moneda. !Cada nivel mezcla mas rapido, hace mas pases y agrega mas vasos!",
     path: "/games/shell-game/",
     accent: "#ffdd53",
     category: "Reflejos",
+  },
+  {
+    id: "pong",
+    title: "PONG",
+    description: "Pong clasico de un solo jugador: devuelve la pelota con tu paleta, la velocidad aumenta y solo tenes una vida.",
+    path: "/games/pong/",
+    accent: "#ffffff",
+    category: "Arcade",
+  },
+  {
+    id: "block-paddle",
+    title: "Block Paddle",
+    description: "Movi la barra de izquierda a derecha para evitar que la pelota caiga. Cada rebote suma puntos y acelera la pelota.",
+    path: "/games/block-paddle/",
+    accent: "#64c8ff",
+    category: "Arcade",
   },
 ];
 

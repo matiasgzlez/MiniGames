@@ -109,6 +109,17 @@ body {
   margin-top: 2px;
 }
 
+.hud__timer {
+  font-size: 20px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  color: #e8c480;
+  text-shadow: 0 0 8px rgba(232, 196, 128, 0.6), 0 2px 4px rgba(0,0,0,0.5);
+}
+.hud__timer:empty {
+  display: none;
+}
+
 /* ── Overlay (start / game over) ─────────────────────────────── */
 .overlay {
   position: absolute;

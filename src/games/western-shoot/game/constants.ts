@@ -6,6 +6,13 @@ export const MAX_DT = 0.1;
 // ── Lives ───────────────────────────────────────────────────────────
 export const INITIAL_LIVES = 3;
 
+// ── Room mode ───────────────────────────────────────────────────────
+/**
+ * En salas la ronda es a tiempo (no por vidas): la partida dura este tanto y
+ * gana quien mas puntos hizo. Fuera de salas el juego sigue siendo por vidas.
+ */
+export const ROOM_ROUND_SEC = 60;
+
 // ── Countdown ───────────────────────────────────────────────────────
 export const COUNTDOWN_LABELS = ["3", "2", "1", "DRAW!"];
 export const COUNTDOWN_STEP = 0.75;

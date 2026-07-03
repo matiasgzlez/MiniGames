@@ -35,6 +35,7 @@ export const GAME_SCORING: Record<string, GameScoring> = {
   "asteroids": { direction: "higher" },
   "mini-frogger": { direction: "higher" },
   "kunai-throw": { direction: "higher" },
+  "dunk-shot": { direction: "higher" },
   "odd-one-out": { direction: "higher" },
   "penalty-keeper": { direction: "higher" },
   "barra-libre": { direction: "higher" },
@@ -50,6 +51,10 @@ export const GAME_SCORING: Record<string, GameScoring> = {
     variantFormat: { solo: formatTimeMoves },
   },
   "reaction-time": {
+    direction: "lower",
+    format: (n) => `${Math.round(n)} ms`,
+  },
+  "blind-time": {
     direction: "lower",
     format: (n) => `${Math.round(n)} ms`,
   },
@@ -79,6 +84,9 @@ export const GAME_SCORING: Record<string, GameScoring> = {
     direction: "higher",
     format: (n) => `Nivel ${n}`,
   },
+  "pong": { direction: "higher" },
+  "block-paddle": { direction: "higher" },
+  "western-shoot": { direction: "higher" },
 };
 
 /**

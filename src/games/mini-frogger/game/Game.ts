@@ -4,6 +4,7 @@ import {
   VIEW_HEIGHT,
   MAX_DT,
   LIVES_START,
+  FROG_HITBOX_HALF,
   type LaneData,
 } from "./constants";
 import { Frog } from "./Frog";
@@ -323,18 +324,23 @@ export class Game {
       const currentLane = this.lanes.get(row);
 
       if (currentLane) {
+        // The frog is, by definition, within this lane's row, so collisions are
+        // a pure horizontal test against each obstacle's visible body. Using the
+        // interpolated (rendered) x keeps deaths in sync with what's on screen.
+        const frogCenterX = this.frog.x + GRID_SIZE / 2;
+
         if (currentLane.type === "road") {
-          // Check car collision
+          // Die only on a real overlap with a car's visible body.
           const hit = currentLane.obstacles.some((obs) =>
-            obs.collidesWith(this.frog.x + 8, this.frog.targetY + 8, GRID_SIZE - 16)
+            obs.overlapsX(frogCenterX, FROG_HITBOX_HALF)
           );
           if (hit) {
             this.killFrog("crash");
           }
         } else if (currentLane.type === "river") {
-          // Check support on log/turtle
+          // Supported (floats) when the frog's centre sits over a log/turtle.
           const supportObs = currentLane.obstacles.find((obs) =>
-            obs.collidesWith(this.frog.x + 14, this.frog.targetY + 12, GRID_SIZE - 28)
+            obs.containsX(frogCenterX)
           );
           if (supportObs) {
             currentLogSpeed = supportObs.speed * supportObs.dir;
