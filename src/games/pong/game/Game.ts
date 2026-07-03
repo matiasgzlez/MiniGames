@@ -21,12 +21,17 @@ type State = "ready" | "countdown" | "playing" | "dead";
 
 const BEST_KEY = "pong:best";
 const SCORE_LIMIT = 7;
-const BROADCAST_INTERVAL = 0.05;
+/** 25 Hz: cada cliente manda 1 msg/tick, holgado bajo el tope de 40 msg/s. */
+const BROADCAST_INTERVAL = 0.04;
 
 const COUNTDOWN_LABELS = ["3", "2", "1", "YA"];
 const COUNTDOWN_STEP = 0.75;
 /** Velocidad de interpolacion de la paleta rival (mayor = mas pegado, menos suave). */
 const PADDLE_LERP_RATE = 18;
+/** Reconciliacion de la pelota en P2 hacia el snapshot del host (suave, no tironea). */
+const BALL_RECONCILE_RATE = 6;
+/** Adelanto (seg) con que se extrapola el snapshot: compensa que llega del pasado. */
+const SNAPSHOT_LEAD = 0.05;
 
 export class Game {
   private readonly canvas: HTMLCanvasElement;
@@ -287,10 +292,16 @@ export class Game {
       this.aiPaddle.clamp();
 
       if (this.hasReceivedBall) {
-        this.ball.x += this.ball.vx * dt;
-        this.ball.y += this.ball.vy * dt;
-        this.ball.x += (this.ballTargetX - this.ball.x) * 0.3;
-        this.ball.y += (this.ballTargetY - this.ball.y) * 0.3;
+        // Prediccion local con la fisica real del host (avance + rebote en
+        // paredes) para que la pelota se mueva a velocidad real y fluida entre
+        // snapshots, usando el vx/vy/speed que llega en cada broadcast.
+        this.ball.update(dt);
+        // Reconciliacion suave hacia el snapshot, extrapolado hacia adelante
+        // por SNAPSHOT_LEAD: el snapshot es del pasado, asi que corregir hacia
+        // su posicion cruda tironearia la pelota hacia atras (efecto stutter).
+        const k = Math.min(1, dt * BALL_RECONCILE_RATE);
+        this.ball.x += (this.ballTargetX + this.ball.vx * SNAPSHOT_LEAD - this.ball.x) * k;
+        this.ball.y += (this.ballTargetY + this.ball.vy * SNAPSHOT_LEAD - this.ball.y) * k;
       }
 
       if (this.score >= SCORE_LIMIT || this.opponentScore >= SCORE_LIMIT) {
