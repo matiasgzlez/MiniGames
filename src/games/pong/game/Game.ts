@@ -1,5 +1,6 @@
 import {
   MAX_DT,
+  PADDLE_HEIGHT,
   PADDLE_MARGIN,
   PADDLE_WIDTH,
   PLAYER_SPEED,
@@ -14,11 +15,13 @@ import { InputController } from "./InputController";
 import { Hud } from "./Hud";
 import { SoundEffects } from "./SoundEffects";
 import { initRoomMode, type RoomMode } from "../../../shared/room/roomMode";
+import { PongChannel } from "./PongChannel";
 
 type State = "ready" | "countdown" | "playing" | "dead";
 
 const BEST_KEY = "pong:best";
 const SCORE_LIMIT = 7;
+const BROADCAST_INTERVAL = 0.05;
 
 const COUNTDOWN_LABELS = ["3", "2", "1", "YA"];
 const COUNTDOWN_STEP = 0.75;
@@ -35,10 +38,20 @@ export class Game {
   private readonly input: InputController;
   private readonly room: RoomMode | null;
   private readonly isRoomMode: boolean;
+  private readonly pongChan: PongChannel | null = null;
+
+  private readonly amPlayer1: boolean;
+  private readonly hasOpponent: boolean;
+  private opponentPaddleY = VIEW_HEIGHT / 2 - PADDLE_HEIGHT / 2;
+  private broadcastTimer = 0;
+
+  private ballTargetX = VIEW_WIDTH / 2;
+  private ballTargetY = VIEW_HEIGHT / 2;
+  private hasReceivedBall = false;
 
   private state: State = "ready";
   private score = 0;
-  private score2 = 0;
+  private opponentScore = 0;
   private best = Number(localStorage.getItem(BEST_KEY)) || 0;
   private lastTime = 0;
   private deadFor = 0;
@@ -61,8 +74,44 @@ export class Game {
     });
     this.isRoomMode = this.room !== null;
 
+    if (this.isRoomMode) {
+      const room = this.room!;
+      const players = room.players();
+      const myIdx = players.indexOf(room.me);
+      this.amPlayer1 = myIdx % 2 === 0;
+      const oppIdx = this.amPlayer1 ? myIdx + 1 : myIdx - 1;
+      this.hasOpponent = oppIdx >= 0 && oppIdx < players.length;
+
+      if (this.hasOpponent) {
+        this.pongChan = new PongChannel(room.code, room.me);
+
+        this.pongChan.onPaddle((_player, y) => {
+          this.opponentPaddleY = y;
+        });
+
+        if (!this.amPlayer1) {
+          this.pongChan.onBall((state) => {
+            this.ballTargetX = state.x;
+            this.ballTargetY = state.y;
+            this.ball.vx = state.vx;
+            this.ball.vy = state.vy;
+            this.ball.speed = state.speed;
+            this.ball.hits = state.hits;
+            this.score = state.p2Score;
+            this.opponentScore = state.p1Score;
+            this.hasReceivedBall = true;
+          });
+        }
+      }
+    } else {
+      this.amPlayer1 = true;
+      this.hasOpponent = false;
+    }
+
     this.hud.setHintText(
-      this.isRoomMode ? "J1: W/S  |  J2: FLECHAS" : "flechas / W S para mover",
+      this.isRoomMode && this.hasOpponent
+        ? this.amPlayer1 ? "W/S — sos J1 (izquierda)" : "FLECHAS — sos J2 (derecha)"
+        : "flechas / W S para mover",
     );
 
     this.input = new InputController(
@@ -96,6 +145,8 @@ export class Game {
     this.player.reset();
     this.aiPaddle.reset();
     this.ball.reset();
+    this.opponentPaddleY = VIEW_HEIGHT / 2 - PADDLE_HEIGHT / 2;
+    this.hasReceivedBall = false;
     this.hud.showScore(false);
     this.hud.hide();
     this.hud.showCountdown(COUNTDOWN_LABELS[0]);
@@ -104,10 +155,16 @@ export class Game {
   private start(): void {
     this.state = "playing";
     this.score = 0;
-    this.score2 = 0;
+    this.opponentScore = 0;
+    this.broadcastTimer = 0;
+    this.hasReceivedBall = false;
+
     if (this.isRoomMode) {
       this.hud.showScoreRoom(0, 0);
-      this.ball.launch(Math.random() < 0.5);
+      if (this.amPlayer1) {
+        this.ball.launch(Math.random() < 0.5);
+        this.broadcastBall();
+      }
     } else {
       this.hud.setScore(0);
       this.hud.showScore(true);
@@ -118,17 +175,16 @@ export class Game {
   }
 
   private die(): void {
+    if (this.state === "dead") return;
     this.state = "dead";
     this.deadFor = 0;
     SoundEffects.playLose();
     this.hud.showScore(false);
-    if (!this.isRoomMode) {
-      if (this.score > this.best) {
-        this.best = this.score;
-        localStorage.setItem(BEST_KEY, String(this.best));
-      }
+    if (!this.isRoomMode && this.score > this.best) {
+      this.best = this.score;
+      localStorage.setItem(BEST_KEY, String(this.best));
     }
-    this.hud.showGameOver(this.score, this.best, this.score2, this.isRoomMode);
+    this.hud.showGameOver(this.score, this.best, this.opponentScore, this.isRoomMode);
     if (this.room) this.room.reportScore(this.score);
     else this.hud.showRanking("pong", this.score);
   }
@@ -145,20 +201,13 @@ export class Game {
 
   private update(dt: number): void {
     if (this.state === "playing") {
-      const p1Dir = this.isRoomMode ? this.input.p1Dir : this.input.moveDir;
-      this.player.y += p1Dir * PLAYER_SPEED * dt;
-      this.player.clamp();
-
-      if (this.isRoomMode) {
-        this.aiPaddle.y += this.input.p2Dir * PLAYER_SPEED * dt;
-        this.aiPaddle.clamp();
+      if (this.isRoomMode && this.hasOpponent) {
+        this.updateOnline(dt);
+      } else if (this.isRoomMode && !this.hasOpponent) {
+        this.updateUnpaired(dt);
       } else {
-        this.ai.update(dt, this.ball);
+        this.updateSolo(dt);
       }
-
-      this.ball.update(dt);
-
-      this.checkCollisions();
     } else if (this.state === "countdown") {
       this.updateCountdown(dt);
     } else if (this.state === "dead") {
@@ -166,29 +215,78 @@ export class Game {
     }
   }
 
-  private checkCollisions(): void {
-    if (this.ball.left <= 0) {
-      if (this.isRoomMode) {
-        this.score2++;
-        this.hud.showScoreRoom(this.score, this.score2);
-        SoundEffects.playScore();
-        if (this.score2 >= SCORE_LIMIT) { this.die(); return; }
-        this.ball.launch(true);
-        return;
+  private updateSolo(dt: number): void {
+    this.player.y += this.input.moveDir * PLAYER_SPEED * dt;
+    this.player.clamp();
+    this.ai.update(dt, this.ball);
+    this.ball.update(dt);
+    this.checkCollisions();
+  }
+
+  private updateUnpaired(dt: number): void {
+    this.player.y += this.input.moveDir * PLAYER_SPEED * dt;
+    this.player.clamp();
+    this.ai.update(dt, this.ball);
+    this.ball.update(dt);
+    this.checkCollisionsRoom();
+  }
+
+  private updateOnline(dt: number): void {
+    if (this.amPlayer1) {
+      this.player.y += this.input.p1Dir * PLAYER_SPEED * dt;
+      this.player.clamp();
+      this.aiPaddle.y = this.opponentPaddleY;
+      this.ball.update(dt);
+      this.checkCollisionsRoom();
+
+      this.broadcastTimer += dt;
+      if (this.broadcastTimer >= BROADCAST_INTERVAL) {
+        this.broadcastTimer = 0;
+        this.pongChan!.sendPaddle(this.player.y);
+        this.broadcastBall();
       }
-      this.die();
-      return;
+    } else {
+      this.player.y = this.opponentPaddleY;
+      this.aiPaddle.y += this.input.p2Dir * PLAYER_SPEED * dt;
+      this.aiPaddle.clamp();
+
+      if (this.hasReceivedBall) {
+        this.ball.x += this.ball.vx * dt;
+        this.ball.y += this.ball.vy * dt;
+        this.ball.x += (this.ballTargetX - this.ball.x) * 0.3;
+        this.ball.y += (this.ballTargetY - this.ball.y) * 0.3;
+      }
+
+      if (this.score >= SCORE_LIMIT || this.opponentScore >= SCORE_LIMIT) {
+        this.die();
+      }
+      this.hud.showScoreRoom(this.amPlayer1 ? this.score : this.opponentScore, this.amPlayer1 ? this.opponentScore : this.score);
+
+      this.broadcastTimer += dt;
+      if (this.broadcastTimer >= BROADCAST_INTERVAL) {
+        this.broadcastTimer = 0;
+        this.pongChan!.sendPaddle(this.aiPaddle.y);
+      }
     }
+  }
+
+  private broadcastBall(): void {
+    this.pongChan!.sendBall({
+      x: this.ball.x,
+      y: this.ball.y,
+      vx: this.ball.vx,
+      vy: this.ball.vy,
+      speed: this.ball.speed,
+      hits: this.ball.hits,
+      p1Score: this.amPlayer1 ? this.score : this.opponentScore,
+      p2Score: this.amPlayer1 ? this.opponentScore : this.score,
+    });
+  }
+
+  private checkCollisions(): void {
+    if (this.ball.left <= 0) { this.die(); return; }
 
     if (this.ball.right >= VIEW_WIDTH) {
-      if (this.isRoomMode) {
-        this.score++;
-        this.hud.showScoreRoom(this.score, this.score2);
-        SoundEffects.playScore();
-        if (this.score >= SCORE_LIMIT) { this.die(); return; }
-        this.ball.launch(false);
-        return;
-      }
       this.score++;
       this.hud.setScore(this.score);
       SoundEffects.playScore();
@@ -196,6 +294,36 @@ export class Game {
       return;
     }
 
+    this.paddleCollisionPlayer();
+    this.paddleCollisionAi();
+    this.wallBounceSound();
+  }
+
+  private checkCollisionsRoom(): void {
+    if (this.ball.left <= 0) {
+      this.opponentScore++;
+      this.hud.showScoreRoom(this.score, this.opponentScore);
+      SoundEffects.playScore();
+      if (this.score >= SCORE_LIMIT || this.opponentScore >= SCORE_LIMIT) { this.die(); return; }
+      this.ball.launch(true);
+      return;
+    }
+
+    if (this.ball.right >= VIEW_WIDTH) {
+      this.score++;
+      this.hud.showScoreRoom(this.score, this.opponentScore);
+      SoundEffects.playScore();
+      if (this.score >= SCORE_LIMIT || this.opponentScore >= SCORE_LIMIT) { this.die(); return; }
+      this.ball.launch(false);
+      return;
+    }
+
+    this.paddleCollisionPlayer();
+    this.paddleCollisionAi();
+    this.wallBounceSound();
+  }
+
+  private paddleCollisionPlayer(): void {
     if (
       this.ball.vx < 0 &&
       this.ball.left <= this.player.right &&
@@ -207,7 +335,9 @@ export class Game {
       this.ball.bouncePaddle(this.player);
       SoundEffects.playHit();
     }
+  }
 
+  private paddleCollisionAi(): void {
     if (
       this.ball.vx > 0 &&
       this.ball.right >= this.aiPaddle.left &&
@@ -219,7 +349,9 @@ export class Game {
       this.ball.bouncePaddle(this.aiPaddle);
       SoundEffects.playHit();
     }
+  }
 
+  private wallBounceSound(): void {
     if (this.ball.top <= 0 || this.ball.bottom >= VIEW_HEIGHT) {
       SoundEffects.playWall();
     }
@@ -271,5 +403,6 @@ export class Game {
   dispose(): void {
     window.removeEventListener("resize", this.resize);
     this.input.dispose();
+    this.pongChan?.dispose();
   }
 }

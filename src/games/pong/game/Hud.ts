@@ -96,8 +96,8 @@ export class Hud {
   showGameOver(score: number, best: number, score2?: number, isRoom?: boolean): void {
     if (isRoom && score2 !== undefined) {
       this.titleEl.textContent =
-        score > score2 ? "JUGADOR 1 GANA" :
-        score2 > score ? "JUGADOR 2 GANA" : "EMPATE";
+        score > score2 ? "GANASTE" :
+        score2 > score ? "PERDISTE" : "EMPATE";
       this.subtitleEl.textContent = "presiona ENTER o toca para continuar";
       this.scoreLineEl.textContent = `${score} - ${score2}`;
     } else {

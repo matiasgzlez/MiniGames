@@ -31,6 +31,28 @@ Single-player classic Pong: the player controls a paddle on the left with up/dow
 
 **Enter-to-start countdown.** Standard repo pattern: 3 / 2 / 1 / YA (`COUNTDOWN_LABELS`, `COUNTDOWN_STEP` in `Game.ts`), 0.6 s restart guard after dying.
 
-## Room mode (multiplayer)
+## Room mode (multiplayer) — online PvP
 
-Wired to the shared party mode: the constructor calls `initRoomMode("pong", { getScore: () => this.score, onStart: () => this.beginCountdown() })` (see root `CLAUDE.md`, "Salas (multiplayer rooms)"). With `?room=` in the URL the game becomes **same-device PvP**: two human players share one screen. No AI. Player 1 (left paddle, W/S) is the room participant; Player 2 (right paddle, Arrow keys) is a guest on the same keyboard. The game ends when either player reaches 7 goals (`SCORE_LIMIT`). Player 1's goals are reported as their room score. Player 2's goals display on screen but are not individually reported to the room (guest player). The restart input is blocked — the room overlay handles the round lifecycle.
+Wired to the shared party mode: the constructor calls `initRoomMode("pong", { getScore: () => this.score, onStart: () => this.beginCountdown() })` (see root `CLAUDE.md`, "Salas (multiplayer rooms)").
+
+With `?room=` in the URL and Supabase connected, Pong becomes **online player-vs-player**. Each player controls one paddle from their own device:
+
+- **Pairing by index.** The room's player list is paired `(0,1), (2,3), ...`. Index even = P1 (left paddle, W/S). Index odd = P2 (right paddle, Arrow keys). If the count is odd, the last player is unpaired and plays vs AI (standard left-paddle controls, first to 7).
+
+- **P1 is ball authority.** P1 (even index, left paddle) runs the full game simulation (both paddles, ball physics, collisions) and broadcasts the ball state via a dedicated Supabase Realtime channel (`room:{code}:pong`, event `"ball"`) at 20 fps.
+
+- **P2 is ball receiver.** P2 (odd index, right paddle) receives ball state from P1 via broadcast and renders it with dead reckoning (velocity advances + 30% correction per frame toward the latest target). P2 sends their own paddle position to P1 via broadcast (event `"paddle"`).
+
+- **Both paddle positions are synced** via the same channel (event `"paddle"`). Each player broadcasts their own paddle Y at 20 fps. The opponent's paddle is displayed at the latest received position.
+
+- **Scoring.** The ball state includes `p1Score` and `p2Score`. P1 updates scores locally on goals; P2 receives them via each ball broadcast. Both clients display `P1 - P2` (P1 on the left, P2 on the right). First to 7 (`SCORE_LIMIT`) ends the match.
+
+- **Score reporting.** Each player reports their OWN goals to the room via `this.room.reportScore(this.score)` on game-over. P1 reports P1's goals; P2 reports P2's goals. Unpaired players report their own score against the AI.
+
+- **Architecture files:**
+  - `game/PongChannel.ts` — Realtime channel wrapper: subscribes to `room:{code}:pong`, handles `"paddle"` and `"ball"` broadcast events, no-op without Supabase credentials.
+  - `game/Game.ts` — routing: `updateOnline` (paired human), `updateUnpaired` (vs AI), `updateSolo` (no room). `checkCollisionsRoom` handles first-to-7 scoring and paddle bounces for P1.
+
+File `PongChannel.ts` is game-specific and independent of `src/shared/room/channel.ts`. It creates its own Supabase channel subscription and does not touch the shared room infrastructure.
+
+Without `?room=` param, no Supabase, or no opponent — the game falls back to standard solo or AI mode seamlessly.
