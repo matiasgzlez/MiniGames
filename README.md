@@ -38,6 +38,7 @@ Hecho con **Vite + TypeScript** (sin framework) y desplegado como sitio estátic
 | Snake | Arcade | Guiá la serpiente para comer, crecé con cada bocado y evitá chocar con las paredes o con tu propia cola. | [Facu-Basualdo](https://github.com/Facu-Basualdo) |
 | Ta-Te-Ti | Puzzle | Ta-Te-Ti sin empates: al colocar tu cuarta ficha desaparece la primera. Solo contra una IA difícil o PvP en salas. | [Facu-Basualdo](https://github.com/Facu-Basualdo) |
 | Topos | Precisión | Aplastá todos los topos que asomen en 60 segundos. Los dorados valen más y las bombas restan. | [Facu-Basualdo](https://github.com/Facu-Basualdo) |
+| Neon Sawblades | Arcade | Corré y saltá sobre las sierras neón que caen para destruirlas, juntá las monedas y estirá el reloj lo máximo que puedas. | [emi1i0](https://github.com/emi1i0) |
 | Conecta 4 | Puzzle | Soltá fichas y alineá 4 en fila, columna o diagonal. Solo contra una IA difícil (racha de victorias) o PvP por turnos en salas. | [Facu-Basualdo](https://github.com/Facu-Basualdo) |
 | Mecano | Reflejos | Juego de mecanografía: escribí la mayor cantidad de palabras en 30 segundos y sumá tu velocidad en palabras por minuto. | [Facu-Basualdo](https://github.com/Facu-Basualdo) |
 | Torres de Hanoi | Puzzle | Mové la torre de discos a la última varilla en la menor cantidad de movimientos, sin apoyar un disco sobre otro más chico. Elegí de 3 a 7 discos o votalos en salas. | [Facu-Basualdo](https://github.com/Facu-Basualdo) |
