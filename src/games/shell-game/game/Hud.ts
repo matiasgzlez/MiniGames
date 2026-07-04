@@ -19,6 +19,8 @@ export class Hud {
 
   private readonly leaderboard = new LeaderboardPanel();
 
+  private ghostEl: HTMLDivElement | null = null;
+
   constructor(container: HTMLElement) {
     // 1. HUD top bar
     this.hudBar = document.createElement("div");
@@ -91,6 +93,7 @@ export class Hud {
     this.hudBar.classList.add("hidden");
     this.multiplayerStatusEl.classList.add("hidden");
     this.clearBoard();
+    this.clearGhost();
 
     this.titleEl.textContent = "EL TRILE";
     this.subtitleEl.textContent =
@@ -112,6 +115,7 @@ export class Hud {
     this.overlayEl.classList.remove("hidden");
     this.hudBar.classList.add("hidden");
     this.multiplayerStatusEl.classList.add("hidden");
+    this.clearGhost();
 
     this.titleEl.textContent = isNewBest ? "NUEVO RECORD" : "FIN DE LA PARTIDA";
     this.subtitleEl.textContent = "¡Buen intento! Tu concentración mejorará con la práctica.";
@@ -153,20 +157,29 @@ export class Hud {
   }
 
   /**
-   * Fade the current board out (used to cross-dissolve between rounds so the old
-   * cups do not snap away). Resolves once the fade finishes; no-ops instantly
-   * when the board is already empty (e.g. first level).
+   * Snapshot the current cups as a ghost layer that stays on screen while the
+   * board is rebuilt, so the outgoing and incoming rounds crossfade with no
+   * blank frame. No-ops when the board is empty (e.g. the first level).
    */
-  fadeOutBoard(): Promise<void> {
-    return new Promise((resolve) => {
-      if (this.cupsContainerEl.children.length === 0) {
-        resolve();
-        return;
-      }
-      this.cupsContainerEl.classList.add("board-faded");
-      this.coinEl.classList.add("board-faded");
-      setTimeout(resolve, 350);
-    });
+  beginCrossfade(): void {
+    this.clearGhost();
+
+    if (this.cupsContainerEl.children.length === 0) return;
+
+    const boardRect = this.boardEl.getBoundingClientRect();
+    const rect = this.cupsContainerEl.getBoundingClientRect();
+
+    const ghost = this.cupsContainerEl.cloneNode(true) as HTMLDivElement;
+    ghost.classList.add("board-ghost");
+    ghost.classList.remove("board-faded");
+    ghost.style.position = "absolute";
+    ghost.style.left = `${rect.left - boardRect.left}px`;
+    ghost.style.top = `${rect.top - boardRect.top}px`;
+    ghost.style.width = `${rect.width}px`;
+    ghost.style.height = `${rect.height}px`;
+
+    this.boardEl.append(ghost);
+    this.ghostEl = ghost;
   }
 
   /** Mark a freshly built board as hidden so it can be faded in. */
@@ -175,13 +188,28 @@ export class Hud {
     this.coinEl.classList.add("board-faded");
   }
 
-  /** Fade the board back in after it was rebuilt. */
+  /** Fade the new board in and, if present, crossfade the ghost snapshot out. */
   revealBoard(): void {
     // Flush the faded (opacity 0) state before clearing it, otherwise adding and
     // removing the class in the same tick cancels out and the fade never runs.
     void this.cupsContainerEl.offsetWidth;
     this.cupsContainerEl.classList.remove("board-faded");
     this.coinEl.classList.remove("board-faded");
+
+    const ghost = this.ghostEl;
+    if (ghost) {
+      this.ghostEl = null;
+      ghost.classList.add("board-faded");
+      setTimeout(() => ghost.remove(), 400);
+    }
+  }
+
+  /** Remove any lingering ghost snapshot immediately. */
+  private clearGhost(): void {
+    if (this.ghostEl) {
+      this.ghostEl.remove();
+      this.ghostEl = null;
+    }
   }
 
   updateStats(level: number): void {

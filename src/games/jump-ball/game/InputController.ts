@@ -64,11 +64,16 @@ export class InputController {
       e.preventDefault();
       this.activeKeys.delete("right");
       this.activeKeys.add("left");
+      // Last input wins: using the keyboard disables mouse-follow until the
+      // mouse moves again, so releasing a key doesn't snap the ball back to the
+      // cursor (which made keyboard steering feel like it did nothing).
+      this.pointerTargetX = null;
       this.onAnyInput();
     } else if (e.code === "ArrowRight" || e.code === "KeyD") {
       e.preventDefault();
       this.activeKeys.delete("left");
       this.activeKeys.add("right");
+      this.pointerTargetX = null;
       this.onAnyInput();
     }
   };

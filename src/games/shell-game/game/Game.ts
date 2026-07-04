@@ -384,12 +384,12 @@ export class Game {
     }
   }
 
-  private async startNextLevel(): Promise<void> {
+  private startNextLevel(): void {
     this.hud.showCountdown(null);
-    // Fade the finished board out before wiping it, so the next round dissolves
-    // in rather than snapping (the new board is faded back in by
-    // playShufflingSequence once it is rebuilt).
-    await this.hud.fadeOutBoard();
+    // Keep a ghost of the finished board on screen while the next one is rebuilt,
+    // so they crossfade (the new board is faded in and the ghost faded out by
+    // playShufflingSequence -> revealBoard) instead of blanking out for a frame.
+    this.hud.beginCrossfade();
     this.startRound();
   }
 

@@ -21,7 +21,10 @@ Built with **Three.js** (see the repo's `threejs-*` skills).
   signal. Keyboard: hold Left/A or Right/D (`getSteerDir` returns -1/0/1).
   Mouse/touch: the ball follows the cursor's horizontal position
   (`getPointerTargetX` maps screen X to a target lane X; screen edges map to the
-  outer lanes). Keyboard steering takes priority over the pointer in `Game.ts`.
+  outer lanes). **Last input wins**: pressing a steer key nulls `pointerTargetX`
+  so mouse-follow stops until the mouse moves again — otherwise releasing a key
+  snapped the ball back to the cursor and keyboard steering felt dead. `Game.ts`
+  uses `getSteerDir` while a key is held, else follows the pointer target if set.
 - `game/Hud.ts` — DOM overlay (live score, start / game-over screens).
 - `game/SoundEffects.ts` — synthesized Web Audio effects (bounce on each
   landing, descending swoop on the death-fall), no assets.

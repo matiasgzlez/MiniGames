@@ -251,11 +251,14 @@ export class Game {
     }
   }
 
-  /** Moves a local paddle: keyboard direction when held, else follow the mouse. */
+  /** Moves a local paddle: keyboard direction when held, else follow the mouse.
+   *  Last input wins: pressing a key disables mouse-follow until the mouse moves
+   *  again, so releasing a key doesn't snap the paddle back to the cursor. */
   private movePlayer(paddle: Paddle, dir: number, dt: number): void {
     if (dir !== 0) {
       paddle.y += dir * PLAYER_SPEED * dt;
       paddle.clamp();
+      this.pointerActive = false;
     } else if (this.pointerActive) {
       paddle.y = this.pointerTargetY - PADDLE_HEIGHT / 2;
       paddle.clamp();
