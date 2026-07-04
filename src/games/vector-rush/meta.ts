@@ -7,5 +7,5 @@ export const meta: GameEntry = {
   path: "/games/vector-rush/",
   accent: "#00fff2",
   category: "Arcade",
-  order: 290,
+  order: 1,
 };

@@ -4,6 +4,7 @@ import { LeaderboardPanel } from "./shared/LeaderboardPanel";
 import { getScoring } from "./shared/scoring";
 import { fetchTop } from "./shared/leaderboard";
 import { isLeaderboardEnabled } from "./shared/supabase";
+import { recordPlay, fetchPlayCounts, cachedPlayCounts } from "./shared/plays";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 const roomsOn = isLeaderboardEnabled();
@@ -57,12 +58,149 @@ for (const cat of categories) {
   filters.append(btn);
 }
 
+// ---------- Control de orden ----------
+
+// Orden de las cards, elegible desde el control de la barra de filtros:
+//   - "popular"  (default): mas jugados primero (conteo de partidas).
+//   - "featured": el orden manual por `order` de cada meta.ts.
+//   - "alpha":    alfabetico por titulo.
+// El modo "popular" arranca con el conteo cacheado (sin parpadeo) y se refresca
+// desde Supabase al terminar de montar. El sort es estable, asi que los empates
+// conservan el orden base de games.ts (por `order`).
+const cardById = new Map<string, HTMLElement>();
+type SortMode = "popular" | "featured" | "alpha";
+const SORT_KEY = "mg:sort";
+let sortMode: SortMode = readSortMode();
+let playCounts = cachedPlayCounts();
+
+const sortControl = document.createElement("div");
+sortControl.className = "sort";
+
+const sortLabel = document.createElement("span");
+sortLabel.className = "sort__label";
+sortLabel.textContent = "Ordenar";
+
+// Dropdown propio (no un <select> nativo, cuya lista la dibuja el SO y no se
+// puede tematizar): un boton disparador + un menu con el estilo del sitio.
+const SORT_LABELS: Record<SortMode, string> = {
+  popular: "Populares",
+  featured: "Destacados",
+  alpha: "A-Z",
+};
+const SORT_ORDER: SortMode[] = ["popular", "featured", "alpha"];
+
+const sortDropdown = document.createElement("div");
+sortDropdown.className = "sort__dropdown";
+
+const sortTrigger = document.createElement("button");
+sortTrigger.type = "button";
+sortTrigger.className = "sort__trigger";
+sortTrigger.setAttribute("aria-haspopup", "listbox");
+sortTrigger.setAttribute("aria-expanded", "false");
+sortTrigger.innerHTML = `
+  <span class="sort__current">${SORT_LABELS[sortMode]}</span>
+  <svg class="sort__chevron" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+`;
+const sortCurrent = sortTrigger.querySelector(".sort__current")!;
+
+const sortMenu = document.createElement("div");
+sortMenu.className = "sort__menu";
+sortMenu.setAttribute("role", "listbox");
+const sortOptions = new Map<SortMode, HTMLButtonElement>();
+for (const mode of SORT_ORDER) {
+  const opt = document.createElement("button");
+  opt.type = "button";
+  opt.className = "sort__option" + (mode === sortMode ? " is-active" : "");
+  opt.setAttribute("role", "option");
+  opt.setAttribute("aria-selected", String(mode === sortMode));
+  opt.textContent = SORT_LABELS[mode];
+  opt.addEventListener("click", () => {
+    selectSort(mode);
+    closeSortMenu();
+  });
+  sortOptions.set(mode, opt);
+  sortMenu.append(opt);
+}
+
+function openSortMenu(): void {
+  sortDropdown.classList.add("is-open");
+  sortTrigger.setAttribute("aria-expanded", "true");
+  document.addEventListener("click", onDocClickForSort);
+  document.addEventListener("keydown", onKeydownForSort);
+}
+function closeSortMenu(): void {
+  sortDropdown.classList.remove("is-open");
+  sortTrigger.setAttribute("aria-expanded", "false");
+  document.removeEventListener("click", onDocClickForSort);
+  document.removeEventListener("keydown", onKeydownForSort);
+}
+function onDocClickForSort(e: MouseEvent): void {
+  if (!sortDropdown.contains(e.target as Node)) closeSortMenu();
+}
+function onKeydownForSort(e: KeyboardEvent): void {
+  if (e.key === "Escape") {
+    closeSortMenu();
+    sortTrigger.focus();
+  }
+}
+function selectSort(mode: SortMode): void {
+  if (mode !== sortMode) {
+    sortMode = mode;
+    try {
+      localStorage.setItem(SORT_KEY, mode);
+    } catch {
+      // ignore
+    }
+    applyOrder();
+  }
+  sortCurrent.textContent = SORT_LABELS[mode];
+  for (const [m, el] of sortOptions) {
+    const active = m === mode;
+    el.classList.toggle("is-active", active);
+    el.setAttribute("aria-selected", String(active));
+  }
+}
+
+sortTrigger.addEventListener("click", (e) => {
+  e.stopPropagation();
+  if (sortDropdown.classList.contains("is-open")) closeSortMenu();
+  else openSortMenu();
+});
+
+sortDropdown.append(sortTrigger, sortMenu);
+sortControl.append(sortLabel, sortDropdown);
+
+// Barra que alinea los filtros de categoria (izquierda) con el orden (derecha).
+const filtersBar = document.createElement("div");
+filtersBar.className = "filters-bar";
+filtersBar.append(filters, sortControl);
+
 // ---------- Grilla de juegos ----------
 
 const grid = document.createElement("div");
 grid.className = "grid";
 
-games.forEach((game, i) => {
+function readSortMode(): SortMode {
+  try {
+    const v = localStorage.getItem(SORT_KEY);
+    if (v === "popular" || v === "featured" || v === "alpha") return v;
+  } catch {
+    // ignore
+  }
+  return "popular";
+}
+
+function orderedGames(): GameEntry[] {
+  if (sortMode === "alpha") {
+    return [...games].sort((a, b) => a.title.localeCompare(b.title));
+  }
+  if (sortMode === "featured") {
+    return [...games]; // games.ts ya viene ordenado por `order`
+  }
+  return [...games].sort((a, b) => (playCounts[b.id] ?? 0) - (playCounts[a.id] ?? 0));
+}
+
+orderedGames().forEach((game, i) => {
   const card = document.createElement("a");
   card.className = "game-card";
   card.href = game.path;
@@ -70,6 +208,13 @@ games.forEach((game, i) => {
   if (game.accent) card.style.setProperty("--accent", game.accent);
   card.dataset.category = game.category;
   card.dataset.search = `${game.title} ${game.description}`.toLowerCase();
+
+  // Suma una partida al contador de popularidad al abrir el juego. Se ignora el
+  // clic-medio / nueva pestana y el boton de ranking (que frena la propagacion).
+  card.addEventListener("click", (e) => {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    recordPlay(game.id);
+  });
 
   // El recuadro es solo la portada (con categoria y ranking como chips
   // superpuestos); el nombre del juego va debajo, fuera del recuadro.
@@ -111,6 +256,7 @@ games.forEach((game, i) => {
   }
 
   grid.append(card);
+  cardById.set(game.id, card);
 });
 
 // Muestra al lider (Top 1) del ranking global junto al nombre del juego.
@@ -223,10 +369,28 @@ footer.innerHTML = `
 
 const main = document.createElement("main");
 main.className = "page";
-main.append(hero, filters);
+main.append(hero, filtersBar);
 if (roomsOn) main.append(roomsBanner);
 main.append(grid, empty);
 app.append(nav, main, footer);
+
+// Reordena las cards segun el modo actual: mueve los nodos existentes al nuevo
+// orden (no los recrea) y refresca el stagger `--i`.
+function applyOrder(): void {
+  orderedGames().forEach((game, i) => {
+    const card = cardById.get(game.id);
+    if (!card) return;
+    card.style.setProperty("--i", String(i));
+    grid.append(card); // re-inserta el nodo existente en la nueva posicion
+  });
+}
+
+// Trae los conteos reales de Supabase; si el orden activo es por popularidad,
+// reordena con los datos frescos. No-op sin credenciales.
+void fetchPlayCounts().then((counts) => {
+  playCounts = counts;
+  if (sortMode === "popular") applyOrder();
+});
 
 // ---------- Ranking modal (solo lectura) ----------
 

@@ -7,5 +7,5 @@ export const meta: GameEntry = {
   path: "/games/penalty-keeper/",
   accent: "#38e07b",
   category: "Reflejos",
-  order: 160,
+  order: 2,
 };

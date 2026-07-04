@@ -7,5 +7,5 @@ export const meta: GameEntry = {
   path: "/games/western-shoot/",
   accent: "#c9883e",
   category: "Precisión",
-  order: 180,
+  order: 3,
 };
