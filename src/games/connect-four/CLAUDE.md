@@ -5,8 +5,8 @@ columna: la ficha "cae" hasta la casilla libre mas baja. Gana quien alinea 4
 fichas propias en horizontal, vertical o diagonal. Si el tablero se llena sin
 linea, es empate. Dos modos sobre el mismo tablero:
 
-- **Solo (sin `?room=`)**: contra una **IA dificil**. El humano es siempre el
-  jugador 0 (cian) y abre cada partida; la IA es el 1 (rosa). Es un modo de
+- **Solo (sin `?room=`)**: contra una **IA dificil**. El humano es el jugador 0
+  (cian); la IA es el 1 (rosa) y abre cada partida (juega primero). Es un modo de
   **racha de supervivencia**: cada victoria suma 1 y arranca otra partida; la
   primera derrota termina la corrida y la racha lograda es el puntaje. Un
   **empate no rompe la racha** (se juega otra partida sin sumar). El ranking

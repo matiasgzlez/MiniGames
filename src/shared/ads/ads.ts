@@ -21,13 +21,15 @@ import { ADSENSE_CLIENT } from "./client";
 const CLIENT = ((import.meta.env.VITE_ADSENSE_CLIENT as string | undefined) ?? "").trim() || ADSENSE_CLIENT || null;
 const PLACEHOLDER = (import.meta.env.VITE_ADS_PLACEHOLDER as string | undefined) === "1";
 
-// data-ad-slot de cada ubicacion. Vacios hasta crear las unidades en AdSense.
+// data-ad-slot de cada tipo de unidad. Vacios hasta crear las unidades en AdSense.
 // No son secretos (van en el HTML del cliente), por eso son constantes y no env vars.
-// Mientras esten vacios, createAdSlot muestra un placeholder en vez de un hueco roto.
+// Se reutilizan en todas las paginas (una instancia por pagina): el riel izquierdo
+// usa el mismo data-ad-slot en todos los juegos, etc. Ver placements.ts.
 export const AD_SLOTS = {
-  landingBanner: "", // TODO: pegar el data-ad-slot del banner del landing
-  gameRailLeft: "", // TODO: pegar el data-ad-slot del riel izquierdo
-  gameRailRight: "", // TODO: pegar el data-ad-slot del riel derecho
+  railLeft: "5299490333", // riel/rascacielos izquierdo
+  railRight: "2240258329", // riel/rascacielos derecho
+  bannerTop: "9927176659", // banner horizontal superior
+  bannerBottom: "8614094989", // banner horizontal inferior
 } as const;
 
 /** Hay anuncios reales configurados (publisher id presente). */
@@ -58,16 +60,7 @@ function injectCss(): void {
       letter-spacing: 2px; text-transform: uppercase;
       min-height: 60px; text-align: center; padding: 8px;
     }
-    .ad-rail {
-      position: fixed; top: 50%; transform: translateY(-50%);
-      width: 160px; height: 600px; z-index: 5;
-    }
-    .ad-rail--left { left: 12px; }
-    .ad-rail--right { right: 12px; }
-    .ad-rail.ad-slot--placeholder { flex-direction: column; }
-    @media (max-width: 1300px) {
-      .ad-rail { display: none; }
-    }
+    .ad-place.ad-slot--placeholder { flex-direction: column; min-height: 0; }
   `;
   document.head.append(style);
 }

@@ -15,16 +15,16 @@ const MAX_Y = FIELD_HALF_HEIGHT - PLAYER_HALF_HEIGHT;
 
 // Ship look: gunmetal hull (lit) with subtle steel panel lines, a tinted-glass
 // canopy and amber charged cannons — a grounded star-fighter palette, no neon.
-const HULL_COLOR = 0x2f3742;
-const EDGE_COLOR = 0x6f7f8c; // steel panel-line trim (kept below the neon-glow range)
-const COCKPIT_COLOR = 0x5b93bd; // tinted-glass canopy
-const ENGINE_COLOR = 0xffb14d; // amber cannon-tip glow
+const HULL_COLOR = 0x1d212a; // sleek carbon-black / dark titanium
+// const EDGE_COLOR = 0x6f7f8c; 
+const COCKPIT_COLOR = 0x1db3d8; // electric cyan-blue canopy
+const ENGINE_COLOR = 0x00f3ff; // electric cyan muzzle glow (unifies ship energy theme)
 
 function makeHullMaterial(): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({
     color: HULL_COLOR,
-    metalness: 0.85,
-    roughness: 0.38,
+    metalness: 0.90, // higher metalness for premium look
+    roughness: 0.28, // lower roughness for sharp glossy reflections
   });
 }
 
@@ -130,9 +130,9 @@ export class Player {
     const nozzleMat = new THREE.MeshBasicMaterial({ color: 0x081014 });
     this.disposables.push(nozzleMat);
     const glowMat = new THREE.MeshBasicMaterial({
-      color: 0xffffff, // white-hot engine cores (match the exhaust trail)
+      color: 0x00f3ff, // electric cyan nozzle interior glow
       transparent: true,
-      opacity: 0.8,
+      opacity: 0.4, // low opacity to keep it subtle and prevent washing out details
       side: THREE.DoubleSide,
     });
     this.disposables.push(glowMat);
@@ -153,11 +153,12 @@ export class Player {
     }
 
     // Forward-facing headlight so approaching obstacles emerge lit from the dark.
+    // Moved further forward (-6.0) so it lights the tunnel ahead without over-exposing the ship's fuselage.
     const headlight = new THREE.PointLight(0x9fe0ff, 45, 60, 2);
-    headlight.position.set(0, 0.4, -1.6);
+    headlight.position.set(0, 0.4, -6.0);
     this.object.add(headlight);
-    // Small engine glow lighting the ship's own tail (kept dim, it was too bright).
-    const engineLight = new THREE.PointLight(0xdff0ff, 2, 3, 2);
+    // Small engine glow lighting the ship's own tail (dimmed from 2 to 0.25 to prevent washing out the metal panel edges).
+    const engineLight = new THREE.PointLight(0xdff0ff, 0.25, 3, 2);
     engineLight.position.set(0, 0, 1.2);
     this.object.add(engineLight);
   }
@@ -216,24 +217,12 @@ export class Player {
   }
 
   /** Neon edge overlay for a geometry, positioned to match its mesh. */
-  private addEdges(geom: THREE.BufferGeometry, thresholdAngle = 20, position?: THREE.Vector3): void {
-    const edgesGeom = new THREE.EdgesGeometry(geom, thresholdAngle);
-    const mat = new THREE.LineBasicMaterial({ color: EDGE_COLOR, transparent: true, opacity: 0.9 });
-    const lines = new THREE.LineSegments(edgesGeom, mat);
-    if (position) lines.position.copy(position);
-    this.object.add(lines);
-    this.disposables.push(edgesGeom, mat);
+  private addEdges(_geom: THREE.BufferGeometry, _thresholdAngle = 20, _position?: THREE.Vector3): void {
+    // Disabled to remove messy segment lines and keep the ship model clean & facherita.
   }
 
   /** Neon edges that copy a mesh's full transform (for rotated wings). */
-  private addEdgesTransformed(geom: THREE.BufferGeometry, mesh: THREE.Mesh): void {
-    const edgesGeom = new THREE.EdgesGeometry(geom, 20);
-    const mat = new THREE.LineBasicMaterial({ color: EDGE_COLOR, transparent: true, opacity: 0.9 });
-    const lines = new THREE.LineSegments(edgesGeom, mat);
-    lines.position.copy(mesh.position);
-    lines.rotation.copy(mesh.rotation);
-    lines.scale.copy(mesh.scale);
-    this.object.add(lines);
-    this.disposables.push(geom, edgesGeom, mat);
+  private addEdgesTransformed(_geom: THREE.BufferGeometry, _mesh: THREE.Mesh): void {
+    // Disabled to remove messy segment lines and keep the ship model clean & facherita.
   }
 }

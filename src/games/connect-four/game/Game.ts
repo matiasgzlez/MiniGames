@@ -21,7 +21,7 @@ import { SoundEffects } from "./SoundEffects";
 
 type State = "ready" | "countdown" | "playing" | "over";
 
-/** El humano siempre es el jugador 0 (abre cada partida); la IA es el 1. */
+/** El humano es el jugador 0; la IA es el 1 y abre cada partida (juega primero). */
 const HUMAN: Player = 0;
 const AI: Player = 1;
 
@@ -126,9 +126,11 @@ export class Game {
   // ---------- Modo solo (vs IA) ----------
 
   private newSoloMatch(): void {
-    this.soloState = createState(HUMAN); // el humano abre cada partida
-    this.busy = false;
+    this.soloState = createState(AI); // la IA abre cada partida
+    // Bloquea el input y deja que la IA juegue primero tras una breve pausa.
+    this.busy = true;
     this.renderSolo();
+    this.schedule(() => this.aiMove(), AI_THINK_MS);
   }
 
   private handleColumn = (col: number): void => {

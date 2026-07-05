@@ -7,8 +7,8 @@ libre) y la partida sigue hasta que alguien arma una linea de 3. El tope de
 fichas es la constante `MAX_PIECES` en `logic.ts`. Dos modos sobre el mismo
 tablero 3x3:
 
-- **Solo (sin `?room=`)**: contra una **IA dificil**. El humano es siempre X y
-  abre cada partida; la IA es O. Es un modo de **racha de supervivencia**: cada
+- **Solo (sin `?room=`)**: contra una **IA dificil**. El humano es X; la IA es O
+  y abre cada partida (juega primero). Es un modo de **racha de supervivencia**: cada
   victoria suma 1 y arranca otra partida; la primera derrota termina la corrida
   y la racha lograda es el puntaje. El ranking global es esa mejor racha.
 - **Sala (`?room=`)**: **PvP** por turnos sobre tablero compartido (como

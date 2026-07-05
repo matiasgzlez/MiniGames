@@ -1,10 +1,10 @@
 import * as THREE from "three";
 import { getDotTexture } from "./dotTexture";
 
-const MAX_PARTICLES = 320;
-const EMIT_PER_PORT = 2; // particles spawned per engine port each frame
-const LIFETIME = 0.24; // seconds (short tail, kept out of the player's sightline)
-const BASE_COLOR = new THREE.Color(0xffffff); // white-hot engine exhaust
+const MAX_PARTICLES = 640;
+const EMIT_PER_PORT = 2; // particles spawned per engine port each frame (thicker trail)
+const LIFETIME = 1.2; // seconds (increased to 1.2s to leave a beautiful trail mapping the ship's path)
+const BASE_COLOR = new THREE.Color(0x3ea7e0); // soft electric blue exhaust
 
 /**
  * A GPU-light additive particle exhaust streaming behind the ship's engines.
@@ -32,7 +32,7 @@ export class EngineTrail {
 
     const mat = new THREE.PointsMaterial({
       map: getDotTexture(),
-      size: 0.17,
+      size: 0.14, // increased from 0.06 for a thicker, more visible trail
       sizeAttenuation: true,
       transparent: true,
       vertexColors: true,
@@ -70,9 +70,7 @@ export class EngineTrail {
       this.colors[k + 2] = BASE_COLOR.b * f;
     }
 
-    // Exhaust streams backward (+Z) roughly with the world flow, plus spread.
-    // Kept short/tight so it reads as a thruster tail, not a giant plume.
-    const backZ = travelSpeed * 0.18 + 2.5;
+    // Exhaust streams backward (+Z) matching the world flow (travelSpeed), leaving the trail stationary in the tunnel.
     for (const port of ports) {
       for (let e = 0; e < EMIT_PER_PORT; e++) {
         const i = this.cursor;
@@ -80,10 +78,10 @@ export class EngineTrail {
         const k = i * 3;
         this.positions[k] = port.x + (Math.random() * 2 - 1) * 0.03;
         this.positions[k + 1] = port.y + (Math.random() * 2 - 1) * 0.03;
-        this.positions[k + 2] = port.z + Math.random() * 0.06;
-        this.velocities[k] = (Math.random() * 2 - 1) * 0.35;
-        this.velocities[k + 1] = (Math.random() * 2 - 1) * 0.35;
-        this.velocities[k + 2] = backZ + Math.random() * 2;
+        this.positions[k + 2] = port.z + 0.18 + Math.random() * 0.06; // added offset (+0.18) to push trail origin behind nozzle rims
+        this.velocities[k] = (Math.random() * 2 - 1) * 0.18; // slightly tighter horizontal dispersion
+        this.velocities[k + 1] = (Math.random() * 2 - 1) * 0.18; // slightly tighter vertical dispersion
+        this.velocities[k + 2] = travelSpeed + (Math.random() * 2 - 1) * 0.5; // match game speed to keep trail fixed in world space
         this.life[i] = LIFETIME;
         this.colors[k] = BASE_COLOR.r;
         this.colors[k + 1] = BASE_COLOR.g;
