@@ -26,9 +26,10 @@ function injectGameAds(): Plugin {
       order: "pre",
       handler(html, ctx) {
         const tags: HtmlTagDescriptor[] = [];
+        const isDev = Boolean(ctx.server);
 
         // Loader de AdSense en el <head> de cada pagina (solo en build).
-        if (!ctx.server && ADSENSE_CLIENT) {
+        if (!isDev && ADSENSE_CLIENT) {
           tags.push({
             tag: "script",
             attrs: {
@@ -51,6 +52,17 @@ function injectGameAds(): Plugin {
             tag: "script",
             attrs: { type: "module" },
             children: `import "/src/shared/ads/gameRails.ts";`,
+            injectTo: "body",
+          });
+        }
+
+        // Selector visual de anuncios: SOLO en dev, en todas las paginas. Se
+        // activa con ?adpick=1 (el propio modulo lo chequea). Nunca en produccion.
+        if (isDev) {
+          tags.push({
+            tag: "script",
+            attrs: { type: "module" },
+            children: `import "/src/shared/ads/adPicker.ts";`,
             injectTo: "body",
           });
         }
