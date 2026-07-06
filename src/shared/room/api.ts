@@ -1,5 +1,6 @@
 import { getSupabase } from "../supabase";
 import type {
+  ReadyRow,
   RoomRow,
   RoomSettings,
   RoomState,
@@ -111,15 +112,16 @@ export async function fetchRoomState(code: string): Promise<RoomState | null> {
   const supabase = getSupabase();
   if (!supabase) return null;
 
-  const [roomRes, playersRes, roundsRes, scoresRes, votesRes] = await Promise.all([
+  const [roomRes, playersRes, roundsRes, scoresRes, votesRes, readyRes] = await Promise.all([
     supabase.from("rooms").select("*").eq("code", code).maybeSingle(),
     supabase.from("room_players").select("player, joined_at").eq("code", code).order("joined_at"),
     supabase.from("room_rounds").select("round_no, game_id").eq("code", code).order("round_no"),
     supabase.from("room_round_scores").select("round_no, player, score, finished").eq("code", code),
     supabase.from("room_votes").select("round_no, player, game_id").eq("code", code),
+    supabase.from("room_ready").select("round_no, player").eq("code", code),
   ]);
 
-  const failed = [roomRes, playersRes, roundsRes, scoresRes, votesRes].find((r) => r.error);
+  const failed = [roomRes, playersRes, roundsRes, scoresRes, votesRes, readyRes].find((r) => r.error);
   if (failed?.error) {
     warn("fetchRoomState", failed.error.message);
     return null;
@@ -132,6 +134,7 @@ export async function fetchRoomState(code: string): Promise<RoomState | null> {
     rounds: (roundsRes.data ?? []) as RoundRow[],
     scores: (scoresRes.data ?? []) as RoundScoreRow[],
     votes: (votesRes.data ?? []) as VoteRow[],
+    ready: (readyRes.data ?? []) as ReadyRow[],
   };
 }
 
@@ -183,7 +186,84 @@ export async function castVote(
 
 // ---------- Mutaciones de host ----------
 
-/** Arranca la ronda roundNo con el juego dado y su deadline. */
+/** Confirmacion "estoy listo" del jugador en la fase briefing de una ronda. */
+export async function markReady(
+  code: string,
+  roundNo: number,
+  player: string,
+): Promise<boolean> {
+  const supabase = getSupabase();
+  if (!supabase) return false;
+  const { error } = await supabase
+    .from("room_ready")
+    .upsert({ code, round_no: roundNo, player });
+  if (error) {
+    warn("markReady", error.message);
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Arranca la ronda roundNo con el juego dado, en fase 'briefing' (instrucciones,
+ * el reloj de la ronda todavia NO corre). Registra la ronda en el historial y
+ * fija el deadline de auto-inicio del briefing. Los juegos que orquestan su
+ * propio arranque multijugador usan startRound (directo a 'playing') en su lugar.
+ */
+export async function startBriefing(
+  code: string,
+  roundNo: number,
+  gameId: string,
+  briefingDeadline: Date,
+): Promise<boolean> {
+  const supabase = getSupabase();
+  if (!supabase) return false;
+
+  const { error: roundError } = await supabase
+    .from("room_rounds")
+    .upsert({ code, round_no: roundNo, game_id: gameId });
+  if (roundError) {
+    warn("startBriefing", roundError.message);
+    return false;
+  }
+
+  const { error } = await supabase
+    .from("rooms")
+    .update({
+      status: "briefing",
+      current_round: roundNo,
+      current_game: gameId,
+      vote_options: null,
+      deadline: briefingDeadline.toISOString(),
+    })
+    .eq("code", code);
+  if (error) {
+    warn("startBriefing", error.message);
+    return false;
+  }
+  return true;
+}
+
+/** Cierra el briefing: pasa a 'playing' y arranca el reloj real de la ronda. */
+export async function beginPlay(code: string, roundDeadline: Date): Promise<boolean> {
+  const supabase = getSupabase();
+  if (!supabase) return false;
+  const { error } = await supabase
+    .from("rooms")
+    .update({ status: "playing", deadline: roundDeadline.toISOString() })
+    .eq("code", code);
+  if (error) {
+    warn("beginPlay", error.message);
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Arranca la ronda roundNo directo a 'playing' (sin briefing). Lo usan los
+ * juegos que sincronizan su propio arranque multijugador (car-race, rocket-arena,
+ * monopoly-mundial), donde una pantalla de instrucciones generica estorbaria.
+ */
 export async function startRound(
   code: string,
   roundNo: number,
@@ -296,6 +376,7 @@ export async function resetRoom(code: string): Promise<boolean> {
     supabase.from("room_rounds").delete().eq("code", code),
     supabase.from("room_round_scores").delete().eq("code", code),
     supabase.from("room_votes").delete().eq("code", code),
+    supabase.from("room_ready").delete().eq("code", code),
   ]);
   const failed = deletes.find((r) => r.error);
   if (failed?.error) {

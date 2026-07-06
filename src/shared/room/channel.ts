@@ -8,13 +8,22 @@ import { getSupabase } from "../supabase";
  * cargar; navegar entre juegos tira el canal y el estado durable vive en
  * Postgres, asi que reconectar es solo volver a suscribirse.
  */
+/** Puntaje en vivo que un jugador emite mientras juega (efimero, no toca la DB). */
+export interface LiveScore {
+  player: string;
+  score: number;
+}
+
 export class RoomChannel {
   private readonly channel: RealtimeChannel | null;
+  private readonly player: string;
   private readonly syncCbs: Array<() => void> = [];
   private readonly presenceCbs: Array<() => void> = [];
+  private readonly liveCbs: Array<(live: LiveScore) => void> = [];
   private tracked = false;
 
   constructor(code: string, player: string, opts: { track?: boolean } = {}) {
+    this.player = player;
     const supabase = getSupabase();
     if (!supabase) {
       this.channel = null;
@@ -30,6 +39,12 @@ export class RoomChannel {
 
     this.channel.on("broadcast", { event: "sync" }, () => {
       for (const cb of this.syncCbs) cb();
+    });
+    this.channel.on("broadcast", { event: "live" }, ({ payload }) => {
+      const live = payload as LiveScore;
+      if (live && typeof live.player === "string" && Number.isFinite(live.score)) {
+        for (const cb of this.liveCbs) cb(live);
+      }
     });
     this.channel.on("presence", { event: "sync" }, () => {
       for (const cb of this.presenceCbs) cb();
@@ -54,9 +69,21 @@ export class RoomChannel {
     void this.channel.send({ type: "broadcast", event: "sync", payload: {} });
   }
 
+  /** Emite el puntaje propio en vivo (para el ranking en tiempo real). */
+  broadcastLive(score: number): void {
+    if (!this.channel || !Number.isFinite(score)) return;
+    const payload: LiveScore = { player: this.player, score };
+    void this.channel.send({ type: "broadcast", event: "live", payload });
+  }
+
   /** Se dispara cuando otro cliente hizo ping (releer la DB). */
   onSync(cb: () => void): void {
     this.syncCbs.push(cb);
+  }
+
+  /** Se dispara con cada puntaje en vivo emitido por otro jugador. */
+  onLive(cb: (live: LiveScore) => void): void {
+    this.liveCbs.push(cb);
   }
 
   /** Se dispara cuando cambia la lista de presentes. */

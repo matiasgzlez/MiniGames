@@ -4,9 +4,10 @@
  * full-screen con z-index por encima del overlay de cada juego, asi tapa el
  * "presiona ENTER para reintentar" sin tocar ningun Hud.
  *
- * Vistas: esperando (checklist de jugadores + countdown), resultados de ronda,
- * votacion del proximo juego, tablero final y error. Ademas un strip superior
- * permanente con codigo / ronda / tiempo mientras se juega.
+ * Vistas: briefing (instrucciones + checklist de "listos"), esperando con
+ * ranking en vivo, resultados de ronda, votacion del proximo juego, tablero
+ * final y error. Ademas un strip superior permanente con codigo / ronda /
+ * tiempo, y un panel-esquina con el ranking en vivo mientras se juega.
  */
 
 const STYLE_ID = "mg-room-styles";
@@ -77,6 +78,35 @@ const CSS = `
   color: #fff; opacity: 0.55; text-decoration: none;
 }
 .mg-room__exit:hover { opacity: 0.9; text-decoration: underline; }
+.mg-room__instructions {
+  font-size: 1rem; line-height: 1.5; opacity: 0.95; text-align: left;
+  background: rgba(255, 255, 255, 0.06); border-radius: 12px;
+  padding: 0.9rem 1rem; margin: 0 0 1.1rem;
+}
+.mg-room__ready { color: #6dffa8; }
+.mg-room__value--pending { opacity: 0.55; }
+
+/* Panel-esquina con el ranking en vivo mientras se juega. */
+.mg-room-live {
+  position: fixed; top: 44px; right: 10px; z-index: 9998;
+  background: rgba(10, 12, 24, 0.72); color: #fff; border-radius: 10px;
+  padding: 0.4rem 0.55rem; font-family: system-ui, sans-serif; font-size: 0.8rem;
+  min-width: 128px; max-width: 44vw; pointer-events: none;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35); backdrop-filter: blur(4px);
+}
+.mg-room-live__title {
+  font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase;
+  opacity: 0.55; margin-bottom: 0.32rem;
+}
+.mg-room-live__row {
+  display: grid; grid-template-columns: 1rem 1fr auto; gap: 0.4rem;
+  align-items: center; padding: 0.12rem 0; font-variant-numeric: tabular-nums;
+}
+.mg-room-live__row--me { font-weight: 800; }
+.mg-room-live__row--offline { opacity: 0.4; }
+.mg-room-live__rank { opacity: 0.55; text-align: right; }
+.mg-room-live__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mg-room-live__score { white-space: nowrap; }
 `;
 
 function ensureStyles(): void {
@@ -90,6 +120,22 @@ function ensureStyles(): void {
 export interface WaitingEntry {
   player: string;
   state: "done" | "playing" | "offline";
+}
+
+/** Fila del ranking en vivo (panel-esquina y pantalla de espera). */
+export interface LiveRow {
+  rank: number;
+  player: string;
+  /** Puntaje ya formateado, o "-" si todavia no puntuo. */
+  scoreText: string;
+  state: "done" | "playing" | "offline";
+}
+
+/** Jugador en la pantalla de instrucciones (fase briefing). */
+export interface BriefingPlayer {
+  player: string;
+  ready: boolean;
+  present: boolean;
 }
 
 export interface ResultEntry {
@@ -122,6 +168,7 @@ export class RoomOverlay {
   private readonly root: HTMLDivElement;
   private readonly boxEl: HTMLDivElement;
   private readonly stripEl: HTMLDivElement;
+  private readonly liveEl: HTMLDivElement;
   private timeEl: HTMLDivElement | null = null;
   private takeoverEl: HTMLButtonElement | null = null;
 
@@ -131,6 +178,10 @@ export class RoomOverlay {
     this.stripEl = document.createElement("div");
     this.stripEl.className = "mg-room-strip";
     this.stripEl.style.display = "none";
+
+    this.liveEl = document.createElement("div");
+    this.liveEl.className = "mg-room-live";
+    this.liveEl.style.display = "none";
 
     this.root = document.createElement("div");
     this.root.className = "mg-room";
@@ -145,7 +196,48 @@ export class RoomOverlay {
     this.boxEl.className = "mg-room__box";
     this.root.append(this.boxEl);
 
-    document.body.append(this.stripEl, this.root);
+    document.body.append(this.stripEl, this.liveEl, this.root);
+  }
+
+  /**
+   * Ranking en vivo en el panel-esquina mientras se juega. null lo oculta.
+   * Es solo lectura (pointer-events: none) para no molestar al juego debajo.
+   */
+  setLiveBoard(rows: LiveRow[] | null, me: string): void {
+    if (!rows || rows.length === 0) {
+      this.liveEl.style.display = "none";
+      return;
+    }
+    this.liveEl.style.display = "";
+    this.liveEl.innerHTML = "";
+
+    const title = document.createElement("div");
+    title.className = "mg-room-live__title";
+    title.textContent = "En vivo";
+    this.liveEl.append(title);
+
+    for (const row of rows) {
+      const el = document.createElement("div");
+      el.className =
+        "mg-room-live__row" +
+        (row.player === me ? " mg-room-live__row--me" : "") +
+        (row.state === "offline" ? " mg-room-live__row--offline" : "");
+
+      const rank = document.createElement("span");
+      rank.className = "mg-room-live__rank";
+      rank.textContent = String(row.rank);
+
+      const name = document.createElement("span");
+      name.className = "mg-room-live__name";
+      name.textContent = row.player;
+
+      const score = document.createElement("span");
+      score.className = "mg-room-live__score";
+      score.textContent = row.scoreText;
+
+      el.append(rank, name, score);
+      this.liveEl.append(el);
+    }
   }
 
   /** Strip superior con codigo / ronda / tiempo. null lo oculta. */
@@ -170,6 +262,8 @@ export class RoomOverlay {
   }
 
   private show(): void {
+    // Cualquier vista modal tapa el panel-esquina: son mutuamente excluyentes.
+    this.liveEl.style.display = "none";
     this.root.style.display = "";
     this.boxEl.innerHTML = "";
     this.timeEl = null;
@@ -296,6 +390,89 @@ export class RoomOverlay {
       state.className = `mg-room__state mg-room__state--${e.state}`;
       state.textContent = STATE_LABELS[e.state];
       list.append(this.buildRow(e.state === "done" ? "OK" : "...", e.player, state, e.player === me));
+    }
+    this.boxEl.append(list);
+  }
+
+  /**
+   * Pantalla de instrucciones antes de la ronda (fase briefing). Muestra el
+   * como se juega, el checklist de quien dio OK y el countdown de auto-inicio.
+   * El reloj de la ronda todavia no corre.
+   */
+  showBriefing(opts: {
+    roundNo: number;
+    totalRounds: number;
+    gameTitle: string;
+    instructions: string;
+    players: BriefingPlayer[];
+    me: string;
+    iAmReady: boolean;
+    onReady: () => void;
+    /** Accion del host para forzar el inicio ("Empezar ya"), o null. */
+    hostAction: { label: string; onClick: () => void } | null;
+  }): void {
+    this.show();
+    this.addKicker(`Ronda ${opts.roundNo}/${opts.totalRounds}`);
+    this.addTitle(opts.gameTitle);
+
+    const instr = document.createElement("p");
+    instr.className = "mg-room__instructions";
+    instr.textContent = opts.instructions;
+    this.boxEl.append(instr);
+
+    const list = document.createElement("ul");
+    list.className = "mg-room__list";
+    for (const p of opts.players) {
+      const state = document.createElement("span");
+      state.className = "mg-room__state" + (p.ready ? " mg-room__state--done" : p.present ? "" : " mg-room__state--offline");
+      state.textContent = p.ready ? "listo" : p.present ? "leyendo..." : "desconectado";
+      list.append(this.buildRow(p.ready ? "OK" : "...", p.player, state, p.player === opts.me));
+    }
+    this.boxEl.append(list);
+
+    if (!opts.iAmReady) {
+      this.addButton("Estoy listo", opts.onReady);
+    } else {
+      const ok = document.createElement("div");
+      ok.className = "mg-room__hint mg-room__ready";
+      ok.textContent = "Listo. Esperando a los demas...";
+      this.boxEl.append(ok);
+    }
+
+    if (opts.hostAction) {
+      const btn = document.createElement("button");
+      btn.className = "mg-room__takeover";
+      btn.type = "button";
+      btn.textContent = opts.hostAction.label;
+      btn.addEventListener("click", opts.hostAction.onClick);
+      this.boxEl.append(btn);
+    }
+
+    this.addTime();
+  }
+
+  /**
+   * Pantalla de espera con ranking en vivo: el jugador ya termino su ronda y
+   * ve como van los demas en tiempo real (los que siguen jugando, los que ya
+   * terminaron y los desconectados).
+   */
+  showLiveWaiting(rows: LiveRow[], me: string): void {
+    this.show();
+    this.addKicker("Sala");
+    this.addTitle("Esperando a los demas...");
+    this.addTime();
+
+    const list = document.createElement("ul");
+    list.className = "mg-room__list";
+    for (const row of rows) {
+      const value = document.createElement("span");
+      value.className = "mg-room__value" + (row.scoreText === "-" ? " mg-room__value--pending" : "");
+      value.textContent = row.scoreText;
+      const small = document.createElement("small");
+      small.className = row.state === "done" ? "mg-room__ready" : "";
+      small.textContent = row.state === "done" ? "listo" : row.state === "offline" ? "desconectado" : "jugando";
+      value.append(small);
+      list.append(this.buildRow(String(row.rank), row.player, value, row.player === me));
     }
     this.boxEl.append(list);
   }

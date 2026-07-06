@@ -7,11 +7,18 @@ import {
   fetchRoomState,
   joinRoom,
   sanitizeCode,
+  startBriefing,
   startRound,
   updateSettings,
 } from "../shared/room/api";
 import { RoomChannel } from "../shared/room/channel";
-import { computeRoundDeadline, randomGameId, roomGameUrl } from "../shared/room/roomMode";
+import {
+  SELF_MANAGED,
+  computeBriefingDeadline,
+  computeRoundDeadline,
+  randomGameId,
+  roomGameUrl,
+} from "../shared/room/roomMode";
 import {
   DEFAULT_ROUND_TIME_LIMIT,
   DEFAULT_TOTAL_ROUNDS,
@@ -541,12 +548,11 @@ function renderLobby(code: string, player: string): void {
       render();
       const settings = localSettings ?? state.room.settings;
       const firstGame = settings.playlist ? settings.playlist[0] : randomGameId();
-      const ok = await startRound(
-        code,
-        1,
-        firstGame,
-        computeRoundDeadline(settings.roundTimeLimitSec),
-      );
+      // Juegos con arranque propio van directo a jugar; el resto pasa por la
+      // pantalla de instrucciones (briefing) donde todos dan OK antes de arrancar.
+      const ok = SELF_MANAGED.has(firstGame)
+        ? await startRound(code, 1, firstGame, computeRoundDeadline(settings.roundTimeLimitSec))
+        : await startBriefing(code, 1, firstGame, computeBriefingDeadline());
       if (!ok) {
         starting = false;
         render();

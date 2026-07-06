@@ -56,6 +56,18 @@ Config & degradation:
 
 Per-game wiring: each `Game.ts` calls `this.hud.showRanking(<id>, score[, size])` right after saving the local best in its game-over handler; each `Hud` mounts a `LeaderboardPanel` in its overlay, exposes `showRanking(...)`, and calls `leaderboard.clear()` in `showStart`. Landing (`src/main.ts`) adds a per-card "Ranking" button that opens a read-only modal (with a variant selector for games that declare `variants`).
 
+## Salas (party rooms)
+
+Modo multijugador por sala, todo en `src/shared/room/` (segundo modulo cross-cutting, backed por Supabase igual que el ranking; sin server). Una sala vive en Postgres (`supabase/rooms.sql`: `rooms`, `room_players`, `room_rounds`, `room_round_scores`, `room_votes`, `room_ready`) y se sincroniza con un canal Realtime (`channel.ts`): presence (quien esta conectado) + broadcast `sync` ("relee la DB") + broadcast `live` (puntaje en vivo, efimero). Cada juego entra al modo sala con `initRoomMode("<id>", { getScore })` (devuelve `null` sin `?room=` o sin Supabase, asi que fuera de sala el juego no cambia). El host es autoritativo por convencion del cliente.
+
+Flujo de una ronda: `lobby` -> `briefing` -> `playing` -> `results` -> (`voting` si no hay playlist) -> siguiente ronda -> `finished`. `RoomOverlay.ts` dibuja todas las vistas (fixed, por encima del HUD de cada juego) y `roomMode.ts` (`RoomModeController`) las orquesta.
+
+- **Briefing (instrucciones + "todos listos"):** antes de cada ronda de un juego estandar se muestra el `instructions` de `games.ts` con un checklist; cada jugador da "Estoy listo" (`room_ready`) y el reloj de la ronda NO corre hasta que todos los presentes confirman (o el host aprieta "Empezar ya", o vence `BRIEFING_TIMEOUT_SEC`). Recien ahi el host hace `beginPlay` y arranca `playing`. Durante el briefing el overlay tapa el puntero y `keyGate` congela el teclado para que nadie arranque antes. `games.ts` tiene un campo `instructions` obligatorio por juego.
+- **Ranking en vivo:** mientras se juega, cada cliente emite su `getScore()` por el broadcast `live` (~1s) y todos arman un ranking en tiempo real: panel-esquina mientras jugas, y tablero completo cuando ya moriste y esperas a los demas. Puro efimero, no toca la DB. El orden respeta la `direction` del juego (`scoring.ts`).
+- **Juegos auto-gestionados** (`SELF_MANAGED` en `roomMode.ts`: `car-race`, `rocket-arena`, `monopoly-mundial`): orquestan su propio arranque sincronizado y su propia vista en vivo (autos en pista, partido, tablero), asi que **no** pasan por briefing ni por el ranking-en-vivo compartido; van directo a `playing` con `startRound`.
+
+Migracion: la fase `briefing` y la tabla `room_ready` son nuevas; ver el bloque de migracion al pie de `supabase/rooms.sql` (hay que reemplazar el CHECK de `status` y crear `room_ready` con sus policies).
+
 ## Shared UX pattern: Enter-to-start countdown
 
 Every game starts the same way: from the start / game-over screen, Enter (or a tap) enters a `countdown` state that shows 3 / 2 / 1 / YA before play begins, then the run starts. The pattern is duplicated per game (not shared code, per the decoupling rule): each `Game.ts` has a `countdown` state plus `COUNTDOWN_LABELS` / `COUNTDOWN_STEP` constants and a `beginCountdown()`; each `Hud` has `showCountdown(text | null)`; each `style.css` has the `.countdown` label styling and `countdown-pop` keyframes. This is mandatory — every game must implement this pattern (see the Conventions rule above); new games are not complete without it.

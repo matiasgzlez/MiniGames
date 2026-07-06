@@ -1,23 +1,38 @@
 import { games } from "../../games";
-import { formatScore } from "../scoring";
+import { formatScore, getScoring } from "../scoring";
 import { getNickname } from "../nickname";
 import { getSupabase } from "../supabase";
 import {
+  beginPlay,
   castVote,
   closeRound,
   fetchRoomState,
   finishRoom,
+  markReady,
   openVote,
   reportScore,
   resetRoom,
   sanitizeCode,
+  startBriefing,
   startRound,
   takeOverHost,
 } from "./api";
-import { RoomChannel } from "./channel";
-import { RoomOverlay, type WaitingEntry } from "./RoomOverlay";
+import { RoomChannel, type LiveScore } from "./channel";
+import { RoomOverlay, type BriefingPlayer, type LiveRow, type WaitingEntry } from "./RoomOverlay";
 import { computeTotals, rankRound } from "./points";
-import type { RoomState } from "./types";
+import { BRIEFING_TIMEOUT_SEC, type RoomState } from "./types";
+
+/**
+ * Juegos que orquestan su propio arranque multijugador y ranking en vivo
+ * (autos en pista, partido en vivo, tablero de Monopoly). NO pasan por la fase
+ * de briefing generica ni por el ranking-en-vivo compartido: arrancan directo a
+ * 'playing' y muestran su propia sincronizacion.
+ */
+export const SELF_MANAGED = new Set(["car-race", "rocket-arena", "monopoly-mundial"]);
+
+/** Cadencia de emision del puntaje en vivo y ventana de frescura de lo recibido. */
+const LIVE_BROADCAST_MS = 1000;
+const LIVE_STALE_MS = 4000;
 
 /**
  * Orquestador del modo sala dentro de cada juego. Contrato minimo por juego:
@@ -81,6 +96,11 @@ export function computeRoundDeadline(roundTimeLimitSec: number): Date {
   return new Date(Date.now() + (roundTimeLimitSec + NAV_GRACE_SEC) * 1000);
 }
 
+/** Tope de auto-inicio del briefing (si alguien no da OK, arranca igual). */
+export function computeBriefingDeadline(): Date {
+  return new Date(Date.now() + BRIEFING_TIMEOUT_SEC * 1000);
+}
+
 const TICK_MS = 500;
 const POLL_MS = 5000;
 const VOTE_SECONDS = 20;
@@ -125,17 +145,23 @@ class RoomModeController implements RoomMode {
   private actionInFlight = false;
   private voteScheduledForRound = 0;
   private hostAbsentSince: number | null = null;
+  /** Puntajes en vivo recibidos de otros jugadores (efimeros, con timestamp). */
+  private readonly liveScores = new Map<string, { score: number; at: number }>();
+  private lastLiveBroadcast = 0;
 
   private readonly gameId: string;
   private readonly code: string;
   private readonly me: string;
   private readonly hooks: RoomModeHooks;
+  /** Este juego orquesta su propio arranque/ranking: sin briefing ni live board. */
+  private readonly selfManaged: boolean;
 
   constructor(gameId: string, code: string, me: string, hooks: RoomModeHooks) {
     this.gameId = gameId;
     this.code = code;
     this.me = me;
     this.hooks = hooks;
+    this.selfManaged = SELF_MANAGED.has(gameId);
   }
 
   async boot(): Promise<void> {
@@ -157,11 +183,33 @@ class RoomModeController implements RoomMode {
     this.channel = new RoomChannel(this.code, this.me);
     this.channel.onSync(() => void this.refresh());
     this.channel.onPresence(() => this.applyState());
+    this.channel.onLive((live) => this.onLive(live));
+
+    // Congela el teclado del juego mientras se muestran las instrucciones, para
+    // que nadie pueda arrancar antes de tiempo (el overlay ya tapa el puntero).
+    if (!this.selfManaged) {
+      window.addEventListener("keydown", this.keyGate, true);
+    }
 
     this.applyState(state);
 
     window.setInterval(() => this.tick(), TICK_MS);
     window.setInterval(() => void this.refresh(), POLL_MS);
+  }
+
+  /** Bloquea las teclas del juego durante el briefing (fase de instrucciones). */
+  private readonly keyGate = (e: KeyboardEvent): void => {
+    const room = this.state?.room;
+    if (!room || room.status !== "briefing") return;
+    if (room.current_round !== this.myRound || room.current_game !== this.gameId) return;
+    e.stopImmediatePropagation();
+  };
+
+  /** Puntaje en vivo recibido de otro jugador: actualiza el ranking en tiempo real. */
+  private onLive(live: LiveScore): void {
+    if (this.selfManaged || live.player === this.me) return;
+    this.liveScores.set(live.player, { score: live.score, at: Date.now() });
+    this.renderLive();
   }
 
   reportScore(finalScore: number): void {
@@ -217,10 +265,22 @@ class RoomModeController implements RoomMode {
     }
 
     switch (room.status) {
+      case "briefing":
+        this.updateStripBriefing();
+        this.renderBriefing();
+        if (this.isHost()) void this.maybeBeginPlay();
+        break;
       case "playing":
         this.updateStrip();
-        if (this.reported) this.renderWaiting();
-        else this.overlay.hide();
+        if (this.selfManaged) {
+          if (this.reported) this.renderWaiting();
+          else this.overlay.hide();
+        } else if (this.reported) {
+          this.renderLive();
+        } else {
+          this.overlay.hide();
+          this.renderLiveBoard();
+        }
         if (this.isHost()) void this.maybeCloseRound();
         break;
       case "results":
@@ -289,8 +349,22 @@ class RoomModeController implements RoomMode {
     const deadline = this.deadlineMs();
     const now = Date.now();
 
-    if (room.status === "playing") {
+    if (room.status === "briefing") {
+      this.updateStripBriefing();
+      if (deadline !== null) {
+        this.overlay.setTimeText(`Empieza en ${formatClock(deadline - now)}`);
+      }
+      if (this.isHost()) void this.maybeBeginPlay();
+    } else if (room.status === "playing") {
       this.updateStrip();
+      // Ranking en vivo: emitir el puntaje propio y refrescar el panel-esquina.
+      if (!this.selfManaged && !this.reported) {
+        if (now - this.lastLiveBroadcast >= LIVE_BROADCAST_MS) {
+          this.lastLiveBroadcast = now;
+          this.channel?.broadcastLive(this.hooks.getScore());
+        }
+        this.renderLiveBoard();
+      }
       if (deadline !== null) {
         this.overlay.setTimeText(`La ronda termina en ${formatClock(deadline - now)}`);
         if (!this.reported && now >= deadline) {
@@ -319,6 +393,12 @@ class RoomModeController implements RoomMode {
     );
   }
 
+  private updateStripBriefing(): void {
+    this.overlay.setStrip(
+      `SALA ${this.code} - Ronda ${this.myRound}/${this.totalRounds()} - Instrucciones`,
+    );
+  }
+
   // ---------- Vistas ----------
 
   private renderWaiting(): void {
@@ -332,6 +412,110 @@ class RoomModeController implements RoomMode {
       state: done.has(player) ? "done" : present.includes(player) ? "playing" : "offline",
     }));
     this.overlay.showWaiting(entries, this.me);
+  }
+
+  // ---------- Briefing (instrucciones antes de la ronda) ----------
+
+  private readyPlayers(): Set<string> {
+    return new Set(
+      this.state!.ready.filter((r) => r.round_no === this.myRound).map((r) => r.player),
+    );
+  }
+
+  private renderBriefing(): void {
+    const state = this.state!;
+    const present = this.channel?.presentPlayers() ?? [];
+    const ready = this.readyPlayers();
+    const players: BriefingPlayer[] = state.players.map((player) => ({
+      player,
+      ready: ready.has(player),
+      present: present.includes(player) || player === this.me,
+    }));
+
+    this.overlay.showBriefing({
+      roundNo: this.myRound,
+      totalRounds: this.totalRounds(),
+      gameTitle: this.gameTitle(this.gameId),
+      instructions: games.find((g) => g.id === this.gameId)?.instructions ?? "",
+      players,
+      me: this.me,
+      iAmReady: ready.has(this.me),
+      onReady: () => void this.sendReady(),
+      hostAction: this.isHost() ? { label: "Empezar ya", onClick: () => void this.forceBegin() } : null,
+    });
+  }
+
+  private async sendReady(): Promise<void> {
+    const state = this.state;
+    if (!state) return;
+    const round = this.myRound;
+    // Optimista: reflejar el OK al instante sin esperar la red.
+    if (!state.ready.some((r) => r.round_no === round && r.player === this.me)) {
+      state.ready.push({ round_no: round, player: this.me });
+    }
+    this.renderBriefing();
+    const ok = await markReady(this.code, round, this.me);
+    if (ok) this.channel?.ping();
+    void this.refresh();
+  }
+
+  // ---------- Ranking en vivo ----------
+
+  /** Combina puntajes ya reportados (DB), en vivo (broadcast) y presencia. */
+  private buildLiveRows(): LiveRow[] {
+    const state = this.state!;
+    const direction = getScoring(this.gameId).direction;
+    const done = new Map<string, number>();
+    for (const s of this.roundScores()) done.set(s.player, s.score);
+    const present = new Set(this.channel?.presentPlayers() ?? []);
+    const now = Date.now();
+
+    type Tmp = { player: string; score: number | null; state: "done" | "playing" | "offline" };
+    const tmp: Tmp[] = state.players.map((player) => {
+      if (done.has(player)) return { player, score: done.get(player)!, state: "done" };
+      if (player === this.me && !this.reported) {
+        return { player, score: this.hooks.getScore(), state: "playing" };
+      }
+      const live = this.liveScores.get(player);
+      const fresh = live !== undefined && now - live.at < LIVE_STALE_MS;
+      if (present.has(player) || fresh) {
+        return { player, score: fresh ? live!.score : null, state: "playing" };
+      }
+      return { player, score: null, state: "offline" };
+    });
+
+    // Orden: con puntaje (por direction) > sin puntaje aun > desconectado.
+    const tier = (t: Tmp): number => (t.state === "offline" ? 2 : t.score === null ? 1 : 0);
+    tmp.sort((a, b) => {
+      const ta = tier(a);
+      const tb = tier(b);
+      if (ta !== tb) return ta - tb;
+      if (ta === 0) {
+        const cmp = direction === "lower" ? a.score! - b.score! : b.score! - a.score!;
+        if (cmp !== 0) return cmp;
+      }
+      return a.player < b.player ? -1 : a.player > b.player ? 1 : 0;
+    });
+
+    return tmp.map((t, i) => ({
+      rank: i + 1,
+      player: t.player,
+      scoreText: t.score === null ? "-" : formatScore(this.gameId, t.score),
+      state: t.state,
+    }));
+  }
+
+  /** Panel-esquina en vivo (mientras juego). */
+  private renderLiveBoard(): void {
+    this.overlay.setLiveBoard(this.buildLiveRows(), this.me);
+  }
+
+  /** Elige la vista en vivo segun si ya termine (espera) o sigo jugando (panel). */
+  private renderLive(): void {
+    if (!this.state || this.navigating) return;
+    if (this.state.room.status !== "playing" || this.selfManaged) return;
+    if (this.reported) this.overlay.showLiveWaiting(this.buildLiveRows(), this.me);
+    else this.renderLiveBoard();
   }
 
   private renderResults(): void {
@@ -502,8 +686,41 @@ class RoomModeController implements RoomMode {
     const state = this.state;
     if (!state) return;
     const roundNo = state.room.current_round + 1;
+    // Juegos con arranque propio: directo a 'playing'. El resto: fase briefing.
+    if (SELF_MANAGED.has(gameId)) {
+      const deadline = computeRoundDeadline(state.room.settings.roundTimeLimitSec);
+      await this.hostAction(() => startRound(this.code, roundNo, gameId, deadline));
+    } else {
+      await this.hostAction(() => startBriefing(this.code, roundNo, gameId, computeBriefingDeadline()));
+    }
+  }
+
+  /**
+   * Cierra el briefing cuando todos los presentes dieron OK, o al vencer el tope.
+   * Solo el host. "Empezar ya" (forceBegin) fuerza el inicio sin esperar.
+   */
+  private async maybeBeginPlay(): Promise<void> {
+    const state = this.state;
+    if (!state || state.room.status !== "briefing") return;
+    const ready = this.readyPlayers();
+    const present = this.channel?.presentPlayers() ?? [];
+    const presentAllReady = state.players.filter((p) => present.includes(p)).every((p) => ready.has(p));
+    const anyPresentReady = present.some((p) => ready.has(p));
+    const deadline = this.deadlineMs();
+    const timedOut = deadline !== null && Date.now() >= deadline;
+    if (!((presentAllReady && anyPresentReady) || timedOut)) return;
+    await this.beginPlayNow();
+  }
+
+  private async beginPlayNow(): Promise<void> {
+    const state = this.state;
+    if (!state || state.room.status !== "briefing" || this.actionInFlight) return;
     const deadline = computeRoundDeadline(state.room.settings.roundTimeLimitSec);
-    await this.hostAction(() => startRound(this.code, roundNo, gameId, deadline));
+    await this.hostAction(() => beginPlay(this.code, deadline));
+  }
+
+  private async forceBegin(): Promise<void> {
+    await this.beginPlayNow();
   }
 
   private async finish(): Promise<void> {
@@ -520,6 +737,7 @@ class RoomModeController implements RoomMode {
     }
     // Solo en fases estables: la presencia parpadea durante la navegacion.
     const stable =
+      state.room.status === "briefing" ||
       state.room.status === "results" ||
       state.room.status === "voting" ||
       state.room.status === "finished" ||

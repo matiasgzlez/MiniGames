@@ -1,5 +1,16 @@
-/** Estado de una sala a lo largo de su vida. */
-export type RoomStatus = "lobby" | "playing" | "results" | "voting" | "finished";
+/**
+ * Estado de una sala a lo largo de su vida. "briefing" es la pantalla de
+ * instrucciones previa a cada ronda: se muestra el como se juega, cada jugador
+ * da OK y recien cuando estan todos (o el host fuerza / vence el tope) la sala
+ * pasa a "playing" y arranca el reloj de la ronda.
+ */
+export type RoomStatus =
+  | "lobby"
+  | "briefing"
+  | "playing"
+  | "results"
+  | "voting"
+  | "finished";
 
 /** Ajustes elegidos por el host al crear la sala. */
 export interface RoomSettings {
@@ -47,6 +58,12 @@ export interface VoteRow {
   game_id: string;
 }
 
+/** Fila de public.room_ready: quien dio OK a las instrucciones de cada ronda. */
+export interface ReadyRow {
+  round_no: number;
+  player: string;
+}
+
 /** Snapshot completo del estado durable de una sala. */
 export interface RoomState {
   room: RoomRow;
@@ -55,7 +72,12 @@ export interface RoomState {
   rounds: RoundRow[];
   scores: RoundScoreRow[];
   votes: VoteRow[];
+  /** Confirmaciones "estoy listo" de la fase briefing (room_ready). */
+  ready: ReadyRow[];
 }
+
+/** Tope de seguridad del briefing: si alguien no da OK, arranca solo igual. */
+export const BRIEFING_TIMEOUT_SEC = 30;
 
 export const ROUND_TIME_LIMIT_OPTIONS = [60, 120, 180] as const;
 export const DEFAULT_ROUND_TIME_LIMIT = 120;
