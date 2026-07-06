@@ -17,6 +17,8 @@ export class Hud {
   private readonly leaderboard = new LeaderboardPanel();
   // Variantes ya enviadas en esta pantalla de fin (para no reenviar al re-ver una pestana).
   private readonly rankSubmitted = new Set<string>();
+  // Variantes que se pueden enviar desde el game-over (el resto es solo lectura).
+  private rankSubmittable = new Set<string>();
 
   constructor(container: HTMLElement) {
     const hud = document.createElement("div");
@@ -139,12 +141,13 @@ export class Hud {
 
   /**
    * Muestra el ranking con un selector de pestanas: "general" (los niveles juntos)
-   * y una por cada nivel. Cada board se envia una sola vez por pantalla de fin (la
-   * primera vez que se ve su pestana), asi ver una pestana registra ese puntaje sin
-   * duplicar al alternar. La pestana "general" va primera y se muestra por defecto.
+   * y una por cada nivel. `submittable` lista las variantes que se envian desde aca
+   * (el general, que solo se conoce al final); las demas ya se enviaron al pasar el
+   * nivel y se muestran de solo lectura. La pestana "general" va primera y por defecto.
    */
-  showRankings(gameId: string, scores: Record<string, number>): void {
+  showRankings(gameId: string, scores: Record<string, number>, submittable: string[] = []): void {
     this.rankSubmitted.clear();
+    this.rankSubmittable = new Set(submittable);
     this.rankTabsEl.innerHTML = "";
     const variants = Object.keys(scores);
     for (const variant of variants) {
@@ -166,10 +169,10 @@ export class Hud {
     const tabs = Array.from(this.rankTabsEl.children) as HTMLButtonElement[];
     const variants = Object.keys(scores);
     tabs.forEach((t, i) => t.classList.toggle("is-active", variants[i] === variant));
-    // Enviar el puntaje solo la primera vez que se abre cada pestana.
-    const score = this.rankSubmitted.has(variant) ? undefined : scores[variant];
-    this.rankSubmitted.add(variant);
-    void this.leaderboard.render(gameId, { variant, score });
+    // Enviar solo las variantes marcadas como enviables, y una unica vez.
+    const canSubmit = this.rankSubmittable.has(variant) && !this.rankSubmitted.has(variant);
+    if (canSubmit) this.rankSubmitted.add(variant);
+    void this.leaderboard.render(gameId, { variant, score: canSubmit ? scores[variant] : undefined });
   }
 
   private rankTabLabel(variant: string): string {

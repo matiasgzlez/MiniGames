@@ -25,6 +25,7 @@ import { getLevel, LEVEL_COUNT, type Level } from "./levels";
 import { Hud } from "./Hud";
 import { SoundEffects } from "./SoundEffects";
 import { encodeTimeMoves, formatClock } from "../../../shared/scoring-core";
+import { submitScoreIfTop } from "../../../shared/leaderboard";
 import { initRoomMode, type RoomMode } from "../../../shared/room/roomMode";
 
 type State = "ready" | "countdown" | "playing" | "crash" | "clear" | "won";
@@ -419,7 +420,13 @@ export class Game {
     // Registra el puntaje propio del nivel recien completado (tiempo + choques).
     const lvlTime = this.elapsed - this.levelStartElapsed;
     const lvlCrashes = this.crashes - this.levelStartCrashes;
-    this.levelScores[this.levelIndex - 1] = encodeTimeMoves(lvlTime, lvlCrashes);
+    const lvlScore = encodeTimeMoves(lvlTime, lvlCrashes);
+    this.levelScores[this.levelIndex - 1] = lvlScore;
+    // Guarda la marca del nivel al pasarlo (si entra al top), no al final: asi queda
+    // registrada aunque la corrida no llegue hasta el final.
+    if (!this.room) {
+      void submitScoreIfTop("circuit-breaker", lvlScore, { variant: `nivel-${this.levelIndex}` });
+    }
 
     if (this.levelIndex < LEVEL_COUNT) {
       // Pasa al siguiente nivel: cartel + pausa; el tiempo/choques se mantienen.
@@ -487,12 +494,14 @@ export class Game {
       return;
     }
 
-    // Ranking con selector: uno general (los 3 niveles juntos) y uno por nivel.
+    // Ranking con selector: uno general (los 3 niveles juntos) y uno por nivel. Los
+    // niveles ya se enviaron al pasarlos (submitScoreIfTop en reachEnd), asi que aca
+    // solo el general se envia; las pestanas de nivel se muestran de solo lectura.
     const scores: Record<string, number> = { general: encoded };
     this.levelScores.forEach((s, i) => {
       scores[`nivel-${i + 1}`] = s;
     });
-    this.hud.showRankings("circuit-breaker", scores);
+    this.hud.showRankings("circuit-breaker", scores, ["general"]);
   }
 
   // --- Render ---

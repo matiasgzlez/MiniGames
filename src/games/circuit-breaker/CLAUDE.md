@@ -99,10 +99,14 @@ paredes**. Si tocas una pared = choque: la senal vuelve al inicio y se cuenta.
 - Cada nivel mide su propio tiempo/choques (`levelStartElapsed`/`levelStartCrashes`
   marcados en `loadLevel`; `reachEnd` guarda `levelScores[nivel-1] =
   encodeTimeMoves(tiempoNivel, choquesNivel)`). El general es el total acumulado.
-- En `win` (sin sala) arma `scores = { general, nivel-1, nivel-2, ... }` y llama
-  `hud.showRankings`, que muestra un **selector de pestanas** (general por defecto) sobre
-  el `LeaderboardPanel`. Cada board se envia una sola vez por pantalla de fin (la primera
-  vez que se abre su pestana; `rankSubmitted` evita duplicados al alternar). Con sala:
-  `reportScore(encoded)` del total y no se muestran rankings.
+- **La marca de cada nivel se envia al pasarlo** (no al final): `reachEnd` llama
+  `submitScoreIfTop("circuit-breaker", lvlScore, { variant: nivel-N })`, que envia solo
+  si entra al Top 10 (y hay nickname). Asi queda registrada aunque la corrida no termine.
+- En `win` (sin sala) arma `scores = { general, nivel-1, ... }` y llama
+  `hud.showRankings(gameId, scores, ["general"])`: un **selector de pestanas** (general
+  por defecto) sobre el `LeaderboardPanel`. Solo las variantes en `submittable` (el
+  general, que recien se conoce al final) se envian desde el game-over; las pestanas de
+  nivel son de **solo lectura** (ya se enviaron al pasarlas). `rankSubmitted` evita
+  reenviar al alternar. Con sala: `reportScore(encoded)` del total, sin rankings.
 - La landing arma su propio selector de variantes desde `scoring.variants`/`variantLabel`
   (el campeon de la tarjeta usa `variants[0]` = `general`).

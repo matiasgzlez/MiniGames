@@ -51,6 +51,31 @@ export async function submitScore(
 }
 
 /**
+ * Envia el puntaje solo si entra al Top N actual (o si todavia hay lugar). Pensado
+ * para guardar marcas parciales al vuelo (p.ej. al pasar de nivel) sin llenar la
+ * tabla con puntajes que no entran. No-op sin credenciales o sin nickname.
+ */
+export async function submitScoreIfTop(
+  gameId: string,
+  score: number,
+  opts: SubmitOpts & { limit?: number } = {},
+): Promise<boolean> {
+  if (!getSupabase()) return false;
+  if (!Number.isFinite(score)) return false;
+  if (!getNickname()) return false;
+
+  const limit = opts.limit ?? 10;
+  const top = await fetchTop(gameId, { variant: opts.variant, limit });
+  if (top.length >= limit) {
+    const worst = top[top.length - 1].score;
+    const qualifies =
+      getDirection(gameId, opts.variant) === "lower" ? score <= worst : score >= worst;
+    if (!qualifies) return false;
+  }
+  return submitScore(gameId, score, { variant: opts.variant, player: opts.player });
+}
+
+/**
  * Trae el Top N del ranking de un juego (y variante). El orden depende de la
  * direccion configurada del juego (menor mejor para reaction-time / sliding).
  * Devuelve [] si no hay credenciales o si falla.
