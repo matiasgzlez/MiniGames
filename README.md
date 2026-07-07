@@ -54,6 +54,7 @@ Hecho con **Vite + TypeScript** (sin framework) y desplegado como sitio estátic
 | Final Sentence | Reflejos | Despertás con un revólver en la sien: escribí cada frase sin fallar porque cada error carga una bala en el tambor. Al terminar la frase se jala el gatillo, una ruleta rusa. Sobreviví y sumá frases. | [Facu-Basualdo](https://github.com/Facu-Basualdo) |
 | Pulso de Acero | Precisión | Una mano sostiene una katana en un dojo a oscuras: mantené el filo en equilibrio (péndulo invertido) inclinando izquierda y derecha, y aguantá lo máximo posible antes de que se caiga. Tu marca es el tiempo que la mantenés parada. | [matiasgzlez](https://github.com/matiasgzlez) |
 | Memoria de Color | Precisión | Un color aparece unos segundos y desaparece: recreálo de memoria moviendo los deslizadores de matiz, saturación y brillo. Tres rondas y tu puntaje es el promedio de aciertos. Descubrí qué tan fiable es tu ojo. | [matiasgzlez](https://github.com/matiasgzlez) |
+| Bomba Palabra | Party | Bomba de palabras por turnos: aparece un fragmento (una sílaba o combo de letras) y tenés hasta que se agote la mecha para escribir una palabra real que lo contenga. Si explota perdés una vida; el último en pie gana. Solo se juega en salas con amigos. | [Facu-Basualdo](https://github.com/Facu-Basualdo) |
 
 ## Empezar
 

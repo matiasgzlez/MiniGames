@@ -1,6 +1,6 @@
 # MiniGames
 
-Monorepo of small browser minigames (Neon Cylinder, Flappy Bird, Stack Tower, Rhythm Tap, Jump Ball, Reaction Time, City Bloxx, Sliding Puzzle, Asteroids, Mini Frogger, Neon Drift, Odd One Out, Dunk Shot, Memoria, Kunai Throw, Keepers!, Western Shoot, Barra Libre, Crono Ciego, El Trile, PONG, Block Paddle, Simon, Topos, Snake, Ta-Te-Ti, Conecta 4, Mecano, Final Sentence, Neon Sawblades, Space Rush, Lights Out, Boilerbound, Timber!, Puerco Araña, Circuit Breaker, Ring Runner, Pulso de Acero, Memoria de Color and Al Centro), each independently playable, plus a landing page to pick one. (Rocket SpaceX / `rocket-arena` still lives in the repo but is hidden from the roster via `hidden: true` in its `meta.ts` due to errors.) Stack: Vite + TypeScript, no framework. Deployed as a static site (Vercel).
+Monorepo of small browser minigames (Neon Cylinder, Flappy Bird, Stack Tower, Rhythm Tap, Jump Ball, Reaction Time, City Bloxx, Sliding Puzzle, Asteroids, Mini Frogger, Neon Drift, Odd One Out, Dunk Shot, Memoria, Kunai Throw, Keepers!, Western Shoot, Barra Libre, Crono Ciego, El Trile, PONG, Block Paddle, Simon, Topos, Snake, Ta-Te-Ti, Conecta 4, Mecano, Final Sentence, Neon Sawblades, Space Rush, Lights Out, Boilerbound, Timber!, Puerco Araña, Circuit Breaker, Ring Runner, Pulso de Acero, Memoria de Color, Al Centro and Bomba Palabra), each independently playable — except Bomba Palabra, which is **rooms-only** (needs a multiplayer room and the game server; see "Game server" below) — plus a landing page to pick one. (Rocket SpaceX / `rocket-arena` still lives in the repo but is hidden from the roster via `hidden: true` in its `meta.ts` due to errors.) Stack: Vite + TypeScript, no framework. Deployed as a static site (Vercel), plus a separate Node game server (`server/`) on Railway for the real-time / server-authoritative games.
 
 ## Conventions (must follow)
 
@@ -90,6 +90,56 @@ Per-game wiring (the only game-side code, ~4 lines in each `Game.ts`, `Hud.ts` u
 Setup note: the rooms schema (including `room_match_state`) is `supabase/rooms.sql`; re-run it in the Supabase SQL Editor after pulling changes that touch it (statements are idempotent).
 
 Degradation matches the leaderboard: without credentials the landing button and `/rooms/` UI don't function and every game behaves exactly as before.
+
+## Game server (tiempo real / autoritativo)
+
+Servidor Node separado en `server/` (socket.io, deploy en Railway) para los
+juegos de sala que necesitan un **arbitro autoritativo** que Supabase no puede
+dar bien: tiempo real (PONG, rocket-arena a futuro) o validacion server-side no
+spoofeable. **Complementa** la infra de salas de Supabase, no la reemplaza:
+Supabase sigue siendo la fuente de verdad de lobby / marcador / rejoin; el server
+solo maneja el **estado en-ronda en memoria** y **no toca la DB**. Plan de fondo:
+`docs/server-realtime-plan.md`. **v1 en uso: Bomba Palabra** (`word-bomb`).
+
+Estructura de `server/` (paquete propio, aislado del build de Vite, con su propio
+`package.json` / `tsconfig.json` / `node_modules`, gitignoreado):
+- `src/index.ts` — crea `io` + health check HTTP (`/health`, devuelve tamano del
+  diccionario) + registra los namespaces de cada juego. Escucha en `PORT`
+  (Railway lo inyecta), CORS a `ALLOWED_ORIGINS` (coma-separado; `*` en dev).
+- `src/rooms.ts` — infra generica reutilizable: `GameRoom` (un socket.io room por
+  `(namespace, code)`, mapeo nickname<->socket, broadcast) + `registerGame(io,
+  namespace, joinEvent, parseJoin, makeSim)` que crea/descarta rooms y reenvia
+  los eventos al `RoomSim` del juego (contrato `join` / `leave` / `message` /
+  `dispose`). Para agregar otro juego server-side se implementa un `RoomSim` y se
+  llama `registerGame` en su propio namespace.
+- `src/protocol.ts` — tipos de mensajes (por juego). **Se duplican en el cliente**
+  (p.ej. `src/games/word-bomb/game/WordBombTransport.ts`) por la regla de
+  decoupling (no se comparte modulo entre `src/` y `server/`); si cambia el
+  protocolo, tocar ambos lados.
+- `src/dictionary.ts` — diccionario de espanol embebido
+  (`an-array-of-spanish-words`, ~636k palabras) para Bomba Palabra: normaliza
+  (conserva la ñ, saca acentos) y precomputa los fragmentos jugables. Vive solo
+  en el server (validacion no spoofeable, sin peso en el bundle del front).
+- `src/games/wordbomb.ts` — `WordBombSim`: turnos, mecha (deadline absoluto),
+  vidas, palabras usadas, validacion y orden de eliminacion. Difunde `wb:state`
+  en cada cambio; el cliente anima la mecha localmente entre snapshots. Ver el
+  `CLAUDE.md` de `word-bomb` para el detalle del flujo y el tuning.
+
+Cliente: env `VITE_GAME_SERVER_URL` (documentada en `.env.example`). El juego
+carga `socket.io-client` con **import dinamico** (no pesa en los juegos que no lo
+usan). **Degradacion (excepcion):** el resto del repo degrada con gracia sin
+credenciales, pero un juego que depende del server (Bomba Palabra) no puede: sin
+`VITE_GAME_SERVER_URL` muestra "no disponible". Es una excepcion deliberada y
+documentada — el juego existe por el server.
+
+Comandos del server (dentro de `server/`): `npm run dev` (tsx watch),
+`npm run build` (tsc -> `dist/`), `npm start` (`node dist/index.js`). Deploy
+Railway: root del servicio = `server/`, build `npm ci && npm run build`, start
+`node dist/index.js`, setear `ALLOWED_ORIGINS` con el origin de Vercel.
+
+Seguridad / trust: mismo nivel spoofeable ya aceptado en el repo (el cliente
+declara su `code`/`nickname`); el server no escribe en Supabase y los puntajes se
+siguen reportando por cada cliente a la DB como en el resto de las salas.
 
 ## Anuncios (Google AdSense)
 
