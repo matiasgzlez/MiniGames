@@ -26,7 +26,18 @@ const CSS = `
   font-weight: 800; letter-spacing: 1.4px; text-transform: uppercase;
   font-variant-numeric: tabular-nums; box-shadow: 0 5px 0 -2px rgba(17, 17, 17, 0.18);
   pointer-events: none; white-space: nowrap;
+  display: flex; align-items: center; gap: 10px;
 }
+/* Luces de jugadores: un punto por jugador, verde vivo / rojo muerto / gris se fue. */
+.mg-room-strip__lights { display: inline-flex; align-items: center; gap: 5px; }
+.mg-room-strip__light {
+  width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid #111;
+  background: #9a988a; box-sizing: border-box; flex-shrink: 0;
+}
+.mg-room-strip__light--alive { background: #0a9d54; }
+.mg-room-strip__light--dead { background: #c81d4a; }
+.mg-room-strip__light--left { background: #9a988a; }
+.mg-room-strip__light--me { box-shadow: 0 0 0 2px #efeee6, 0 0 0 3.5px #111; }
 .mg-room {
   position: fixed; inset: 0; z-index: 10000; display: flex;
   align-items: center; justify-content: center; padding: 16px;
@@ -131,6 +142,13 @@ export interface WaitingEntry {
   state: "done" | "playing" | "offline";
 }
 
+/** Una luz de jugador en el strip: viva (verde), muerta (roja) o desconectada (gris). */
+export interface StripLight {
+  state: "alive" | "dead" | "left";
+  /** Resalta la luz propia con un anillo. */
+  me: boolean;
+}
+
 export interface ResultEntry {
   rank: number;
   player: string;
@@ -163,6 +181,8 @@ export class RoomOverlay {
   private readonly root: HTMLDivElement;
   private readonly boxEl: HTMLDivElement;
   private readonly stripEl: HTMLDivElement;
+  private readonly stripTextEl: HTMLSpanElement;
+  private readonly stripLightsEl: HTMLSpanElement;
   private timeEl: HTMLDivElement | null = null;
   private takeoverEl: HTMLButtonElement | null = null;
 
@@ -186,6 +206,10 @@ export class RoomOverlay {
     this.stripEl = document.createElement("div");
     this.stripEl.className = "mg-room-strip";
     this.stripEl.style.display = "none";
+    this.stripTextEl = document.createElement("span");
+    this.stripLightsEl = document.createElement("span");
+    this.stripLightsEl.className = "mg-room-strip__lights";
+    this.stripEl.append(this.stripTextEl, this.stripLightsEl);
 
     this.root = document.createElement("div");
     this.root.className = "mg-room";
@@ -203,14 +227,30 @@ export class RoomOverlay {
     document.body.append(this.stripEl, this.root);
   }
 
-  /** Strip superior con codigo / ronda / tiempo. null lo oculta. */
-  setStrip(text: string | null): void {
+  /**
+   * Strip superior con codigo / ronda / tiempo. null lo oculta. `lights` dibuja
+   * un punto por jugador (verde vivo / rojo muerto / gris desconectado); vacio no
+   * muestra ninguno.
+   */
+  setStrip(text: string | null, lights: StripLight[] = []): void {
     if (text === null) {
       this.stripEl.style.display = "none";
       return;
     }
     this.stripEl.style.display = "";
-    this.stripEl.textContent = text;
+    this.stripTextEl.textContent = text;
+    this.renderStripLights(lights);
+  }
+
+  private renderStripLights(lights: StripLight[]): void {
+    this.stripLightsEl.textContent = "";
+    for (const light of lights) {
+      const dot = document.createElement("span");
+      dot.className =
+        `mg-room-strip__light mg-room-strip__light--${light.state}` +
+        (light.me ? " mg-room-strip__light--me" : "");
+      this.stripLightsEl.append(dot);
+    }
   }
 
   /** Actualiza solo el countdown de la vista actual (esperando / votacion). */
