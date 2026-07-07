@@ -58,3 +58,56 @@ export interface WbServerToClient {
   "wb:typing": (msg: { player: string; text: string }) => void;
   "wb:gameover": (msg: WbGameover) => void;
 }
+
+/* ============================ PONG (namespace /pong) ============================ */
+
+/**
+ * Contrato de mensajes socket.io de PONG (namespace `/pong`).
+ *
+ * En sala el juego es PvP: la sala se empareja de a dos (jugadores 0-1, 2-3, ...);
+ * el impar juega contra la IA. Cada par es un "match" con su propia pelota. El
+ * server es autoritativo de la fisica de la pelota, las colisiones y el puntaje;
+ * cada cliente solo controla su paleta (manda su Y) y renderiza los snapshots
+ * (prediccion + reconciliacion suave entre ellos). Mismo nivel de confianza
+ * spoofeable ya aceptado en el repo; el server no escribe en Supabase.
+ */
+
+export interface PongBall {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  /** Rapidez actual (rampa por cada rebote de paleta). */
+  speed: number;
+  /** Rebotes de paleta acumulados (para la rampa de velocidad). */
+  hits: number;
+}
+
+export type PongPhase = "countdown" | "playing" | "over";
+
+/** Snapshot del match que el server difunde a cada jugador del par. */
+export interface PongMatchState {
+  /** Lado de ESTE jugador: "p1" = paleta izquierda, "p2" = paleta derecha. */
+  side: "p1" | "p2";
+  phase: PongPhase;
+  ball: PongBall;
+  /** Y de la paleta izquierda / derecha (coord de vista, no escaladas). */
+  p1Y: number;
+  p2Y: number;
+  p1Score: number;
+  p2Score: number;
+  /** El rival de ESTE jugador es la IA del server (impar sin pareja o ausente). */
+  vsAi: boolean;
+}
+
+/** Cliente -> Server. */
+export interface PongClientToServer {
+  "pg:join": (msg: { code: string; nickname: string; roster: string[] }) => void;
+  /** Posicion Y de la paleta propia (coord de vista). */
+  "pg:paddle": (msg: { y: number }) => void;
+}
+
+/** Server -> Cliente. */
+export interface PongServerToClient {
+  "pg:state": (state: PongMatchState) => void;
+}

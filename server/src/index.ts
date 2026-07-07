@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { Server } from "socket.io";
 import { fragmentCount, wordCount } from "./dictionary.js";
 import { registerWordBomb } from "./games/wordbomb.js";
+import { registerPong } from "./games/pong.js";
 
 /**
  * Game server autoritativo de tiempo real. v1: Bomba Palabra. Complementa la
@@ -32,6 +33,7 @@ const io = new Server(httpServer, {
 });
 
 registerWordBomb(io);
+registerPong(io);
 
 httpServer.listen(PORT, () => {
   console.log(

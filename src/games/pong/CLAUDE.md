@@ -31,36 +31,29 @@ Single-player classic Pong: the player controls a paddle on the left with the mo
 
 **Enter-to-start countdown.** Standard repo pattern: 3 / 2 / 1 / YA (`COUNTDOWN_LABELS`, `COUNTDOWN_STEP` in `Game.ts`), 0.6 s restart guard after dying.
 
-## Room mode (multiplayer) — online PvP
+## Room mode (multiplayer) — server-authoritative PvP
 
 Wired to the shared party mode: the constructor calls `initRoomMode("pong", { getScore: () => this.score, onStart: () => this.beginCountdown() })` (see root `CLAUDE.md`, "Salas (multiplayer rooms)").
 
-With `?room=` in the URL and Supabase connected, Pong becomes **online player-vs-player**. Each player controls one paddle from their own device:
+With `?room=` in the URL, Supabase connected **and** `VITE_GAME_SERVER_URL` set, Pong becomes **online 1v1 arbitrated by the game server** (namespace `/pong`, see root `CLAUDE.md`, "Game server"). This is the second game after word-bomb to use the authoritative server. Supabase still owns lobby / cumulative scoreboard / rejoin / round deadline; the game server owns the **in-round physics**.
 
-- **Pairing by index.** The room's player list is paired `(0,1), (2,3), ...`. Index even = P1 (left paddle, W/S). Index odd = P2 (right paddle, Arrow keys). If the count is odd, the last player is unpaired and plays vs AI (combined W/S + arrows controls, first to 7). The player list is ordered by `joined_at` from the DB, so every client agrees on the pairing.
+- **The server is the ball authority.** `server/src/games/pong.ts` (`PongSim`) pairs the room's `roster` `(0,1),(2,3),...` into one **match per pair** (odd one out plays vs a server AI), runs the ball physics / collisions / speed ramp / scoring for every match on a ~30 fps interval, and broadcasts `pg:state` to each seated player (their own `side` = `"p1"` left / `"p2"` right, both scores, both paddle Ys, the ball, and `vsAi`). First to 7 (`SCORE_LIMIT`, mirrored on both sides) ends that match. This replaced the old P1-authority Supabase-broadcast model (`PongChannel`, deleted), which was jittery for the non-host.
 
-- **Roles are resolved at round start, not in the constructor.** `initRoomMode` returns synchronously but loads `room.players()` asynchronously (`boot()`), so the list is still empty during construction. `Game.setupRoles()` (called from `beginCountdown()`, which `onStart` fires once the round is `playing`) is where the paddle side, opponent, and `PongChannel` get resolved — by then `players()` is populated. Computing this in the constructor misclassifies everyone as unpaired.
+- **The client owns only its paddle.** Each frame the local paddle follows local input immediately (mouse / arrows / W-S, combined — every player is on their own device controlling one paddle) and its Y is sent to the server once per tick (`BROADCAST_INTERVAL`, `pg:paddle`). The opponent paddle is interpolated toward the server's echoed Y (`smoothOpponentPaddle` / `PADDLE_LERP_RATE`). The ball is **predicted locally** with the real `Ball.update(dt)` using the latest `vx/vy/speed`, and reconciled *gently* toward the last snapshot extrapolated forward by `SNAPSHOT_LEAD` (`BALL_RECONCILE_RATE`); a snapshot that jumps more than `BALL_SNAP_DIST` (goal reset / relaunch / hard bounce) **snaps** instead of lerping. Same prediction/reconcile approach the old P2 used, now applied symmetrically on both sides.
 
-- **The unpaired (vs-AI) player launches the ball locally.** Only P1 serves in a paired match (P2 receives the ball over the channel); an unpaired player has no P1, so `start()` launches the ball itself when `!hasOpponent`. Otherwise the ball would sit frozen at center.
+- **Side comes from the server, not computed.** `initRoomMode` loads `room.players()` async (`boot()`), so the constructor can't know the pairing. The client just connects on `beginCountdown()` (`connectServer`) announcing `{code, nickname, roster}` and learns its `side` from the first `pg:state`; it never derives pairing itself, so there's no client/server drift. `hintFixed` sets the "sos J1/J2" hint once from that first snapshot.
 
-- **Broadcast payload nesting.** Supabase wraps broadcast data as `{ type, event, payload }`; `PongChannel` destructures `({ payload }) => ...` to read the real data (matching car-race / rocket-arena). Reading the envelope directly yields `undefined` fields (frozen ball, motionless opponent paddle).
+- **Preroll keeps the countdown honest.** The server holds each match's ball frozen at center for `PREROLL_MS` (3s, matching the client's 3/2/1/YA) after building the match, then launches — so nobody loses a point before their countdown finishes. The match starts once all roster players connect, or after `START_GRACE_MS` (8s).
 
-- **P1 is ball authority.** P1 (even index, left paddle) runs the full game simulation (both paddles, ball physics, collisions) and broadcasts the ball state via a dedicated Supabase Realtime channel (`room:{code}:pong`, event `"ball"`) at 20 fps.
+- **Disconnect = AI, not elimination.** A seated player who disconnects has their paddle driven by the server AI (`humanControls` checks `room.isConnected`); on rejoin (page reload) they resume control and get the current state via `emitStateTo`. Absent players still get a seat at start (the full roster is seated), so a partner always has a real match slot to come back to.
 
-- **P2 is ball receiver, with local prediction + reconciliation.** P2 (odd index, right paddle) receives ball state from P1 via broadcast, then predicts locally: it runs the real `Ball.update(dt)` each frame (true-speed motion + wall bounces) using the latest `vx/vy/speed` from snapshots, and reconciles *gently* toward the snapshot position — extrapolated forward by `SNAPSHOT_LEAD` so the correction never yanks the ball backward toward a stale (past) position. The old approach (advance-by-velocity then pull 30%/frame toward the raw stale target) fought the prediction, making the ball look slow, jittery, and wall-tunnel; that's what "va muy mal para el no-anfitrion" was. `BALL_RECONCILE_RATE` / `SNAPSHOT_LEAD` are the tuning knobs. P2 sends only its own paddle position to P1 (event `"paddle"`). Residual limit: the bounce off P2's own paddle is still confirmed by P1 (a round-trip), so a very high-latency link can still feel a slight delay on P2's own hits — would need client-side paddle-bounce prediction to remove.
+- **Scoring.** Each player reports their OWN goals via `this.room.reportScore(this.score)` on `pg:state.phase === "over"` (higher = better, the default board). Room scores never go to the global leaderboard.
 
-- **One message per tick, and paddle rides the ball.** To stay under the Realtime rate limit, each side broadcasts exactly one message per 20 fps tick. P1's `"ball"` payload carries P1's paddle Y (`BallState.paddleY`), so P1 never sends a separate `"paddle"` event; only P2 sends `"paddle"` (its right paddle). Sending paddle + ball separately from P1 was 40 msg/s, over the default 10 msg/s ceiling — messages queued and both paddle and ball lagged/teleported. The ceiling is raised to 40 in `src/shared/supabase.ts` (`realtime.params.eventsPerSecond`), shared by all real-time games.
-
-- **Opponent paddle is interpolated, not snapped.** Received positions land in `opponentPaddleTargetY`; each frame `smoothOpponentPaddle(dt)` lerps `opponentPaddleY` toward it (`PADDLE_LERP_RATE`, dt-scaled). Assigning the raw received value made the paddle jump between 20 fps updates.
-
-- **Scoring.** The ball state includes `p1Score` and `p2Score`. P1 updates scores locally on goals; P2 receives them via each ball broadcast. Both clients display `P1 - P2` (P1 on the left, P2 on the right). First to 7 (`SCORE_LIMIT`) ends the match.
-
-- **Score reporting.** Each player reports their OWN goals to the room via `this.room.reportScore(this.score)` on game-over. P1 reports P1's goals; P2 reports P2's goals. Unpaired players report their own score against the AI.
+- **Degradation.** In room mode **without** `VITE_GAME_SERVER_URL`, Pong falls back to a **local vs-AI** match per player (`updateUnpaired` + `checkCollisionsRoom`, first to 7) that still reports a score — so the room never gets stuck. Without `?room=` at all it's the normal solo endless mode.
 
 - **Architecture files:**
-  - `game/PongChannel.ts` — Realtime channel wrapper: subscribes to `room:{code}:pong`, handles `"paddle"` and `"ball"` broadcast events, no-op without Supabase credentials.
-  - `game/Game.ts` — routing: `updateOnline` (paired human), `updateUnpaired` (vs AI), `updateSolo` (no room). `checkCollisionsRoom` handles first-to-7 scoring and paddle bounces for P1.
+  - `game/PongProtocol.ts` — transport interface + `PongMatchState` / `PongBall` types that **mirror** `server/src/protocol.ts` (duplicated per the decoupling rule; change both sides together).
+  - `game/PongSocket.ts` — socket.io-client transport (dynamic import) against `/pong`; announces `{code, nickname, roster}`, forwards `pg:state`, sends `pg:paddle`.
+  - `game/Game.ts` — routing in `update()`: `updateServer` (room + server), `updateUnpaired` (room, no server = local AI), `updateSolo` (no room). `onServerState` maps the snapshot into local score / opponent paddle / ball; `applyBallSnapshot` does the snap-or-reconcile.
 
-File `PongChannel.ts` is game-specific and independent of `src/shared/room/channel.ts`. It creates its own Supabase channel subscription and does not touch the shared room infrastructure.
-
-Without `?room=` param, no Supabase, or no opponent — the game falls back to standard solo or AI mode seamlessly.
+Tuning that must stay in sync with the server (`server/src/games/pong.ts`) because the server duplicates the physics constants: `constants.ts` (view size, paddle/ball geometry, speeds, ramp) and `SCORE_LIMIT` (7). If you change ball/paddle tuning, change both files.
