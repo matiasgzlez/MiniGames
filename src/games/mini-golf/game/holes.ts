@@ -93,11 +93,12 @@ function wall(x0: number, z0: number, x1: number, z1: number, h = H): WallDef {
   };
 }
 
-// Hole 1 — "La Herradura": a true U dogleg (layout designed in the map
-// editor). The central block seals the direct tee -> hole line completely
-// (it meets the near wall), so every shot goes around the bend, where a
-// bumper guards each lane. The hole sits partway down the far lane: the ace
-// is one strong bank around the whole U, threading both bumpers.
+// Hole 1 — "La Herradura": a true U dogleg (layout designed by the project
+// owner in the map editor). The central block seals the direct tee -> hole
+// line completely (it meets the near wall), so every shot goes around the
+// bend, where a bumper guards each lane. The hole sits partway down the far
+// lane: the ace is one strong bank around the whole U, threading both
+// bumpers.
 const HERRADURA: HoleDef = {
   name: "La Herradura",
   par: 2,
@@ -125,6 +126,7 @@ const HERRADURA: HoleDef = {
     { kind: "barrel", x: -2.95, z: 10.3 },
   ],
 };
+
 // Hole 2 — "El Molino": straight fairway, a striped bar sweeps the full
 // width mid-way (time it), then an uphill slope to a raised green. The
 // shortcut is a blue side ramp: at full power the ball flies over the bar
