@@ -27,6 +27,23 @@ const AVATAR_SVG = `
 /** Radio del circulo de jugadores, como fraccion del semilado de la arena. */
 const RING_RADIUS = 0.37;
 
+/** Circunferencia del anillo de mecha (r=46 en el viewBox 100x100 del SVG). */
+const FUSE_CIRC = 2 * Math.PI * 46;
+/** Debajo de esta fraccion la mecha entra en "critico" (pulso + rojo). */
+const FUSE_CRITICAL = 0.25;
+
+/**
+ * Color de la mecha por fraccion restante: de chispa amarilla (llena) a rojo
+ * peligro (vacia), interpolado en RGB. Mismos tonos que --spark / --danger.
+ */
+function fuseColor(frac: number): string {
+  const t = Math.max(0, Math.min(1, frac));
+  const r = Math.round(226 + (245 - 226) * t);
+  const g = Math.round(59 + (197 - 59) * t);
+  const b = Math.round(59 + (24 - 59) * t);
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
 /**
  * DOM de Bomba Palabra (estetica "mesa de bomba", ver DESIGN.md): los jugadores
  * forman un circulo alrededor de la bomba central; cada uno es nombre arriba,
@@ -40,10 +57,18 @@ export class Hud {
   private readonly stage: HTMLDivElement;
   private readonly arena: HTMLDivElement;
   private readonly bombFragEl: HTMLDivElement;
+  private readonly bombTimeEl: HTMLDivElement;
+  private readonly fuseEl: SVGSVGElement;
+  private readonly fuseBar: SVGCircleElement;
   private readonly pointer: HTMLDivElement;
   private readonly input: HTMLInputElement;
   private readonly overlay: HTMLDivElement;
   private readonly countdownEl: HTMLDivElement;
+
+  /** Mecha visible: anclaje al reloj monotono local para animar sin drift. */
+  private fuseEnd = 0;
+  private fuseTotalMs = 0;
+  private fuseRaf: number | null = null;
 
   /** Celda de palabra por jugador (para actualizar el tipeo sin re-render). */
   private wordEls = new Map<string, HTMLDivElement>();
@@ -61,8 +86,13 @@ export class Hud {
     wrap.innerHTML = `
       <div class="wb__stage" hidden>
         <div class="wb__arena">
+          <svg class="wb__fuse" viewBox="0 0 100 100" hidden aria-hidden="true">
+            <circle class="wb__fuse-track" cx="50" cy="50" r="46"></circle>
+            <circle class="wb__fuse-bar" cx="50" cy="50" r="46"></circle>
+          </svg>
           <div class="wb__bomb">
             <div class="wb__bomb-frag"></div>
+            <div class="wb__bomb-time"></div>
           </div>
           <div class="wb__pointer" hidden></div>
         </div>
@@ -78,6 +108,10 @@ export class Hud {
     this.stage = wrap.querySelector(".wb__stage")!;
     this.arena = wrap.querySelector(".wb__arena")!;
     this.bombFragEl = wrap.querySelector(".wb__bomb-frag")!;
+    this.bombTimeEl = wrap.querySelector(".wb__bomb-time")!;
+    this.fuseEl = wrap.querySelector(".wb__fuse")!;
+    this.fuseBar = wrap.querySelector(".wb__fuse-bar")!;
+    this.fuseBar.style.strokeDasharray = String(FUSE_CIRC);
     this.pointer = wrap.querySelector(".wb__pointer")!;
     this.input = wrap.querySelector(".wb__input")!;
     this.overlay = wrap.querySelector(".wb__overlay")!;
@@ -211,6 +245,51 @@ export class Hud {
     this.setInputEnabled(view.myTurn);
     if (view.myTurn) this.setWord(this.me, this.input.value);
   }
+
+  // ---------- Mecha visible ----------
+
+  /**
+   * Arranca/actualiza el anillo de la mecha. `remainingMs` y `totalMs` vienen del
+   * server; se anclan al reloj monotono local (`performance.now()`) para animar
+   * sin depender del epoch del server (cero drift de reloj). Idempotente: llamarla
+   * en cada snapshot solo re-ancla; el loop rAF ya en curso toma los nuevos valores.
+   */
+  setFuse(remainingMs: number, totalMs: number): void {
+    // Guarda contra valores no finitos (p.ej. un server viejo que manda undefined).
+    if (!Number.isFinite(remainingMs) || !Number.isFinite(totalMs) || totalMs <= 0) {
+      this.clearFuse();
+      return;
+    }
+    this.fuseEnd = performance.now() + remainingMs;
+    this.fuseTotalMs = totalMs;
+    this.fuseEl.removeAttribute("hidden"); // SVGSVGElement no tipa `hidden` como prop
+    if (this.fuseRaf === null) this.tickFuse();
+  }
+
+  /** Oculta y detiene la mecha (fuera de "playing", game over). */
+  clearFuse(): void {
+    if (this.fuseRaf !== null) {
+      cancelAnimationFrame(this.fuseRaf);
+      this.fuseRaf = null;
+    }
+    this.fuseEl.setAttribute("hidden", "");
+    this.fuseEl.classList.remove("is-critical");
+    this.bombTimeEl.textContent = "";
+  }
+
+  private readonly tickFuse = (): void => {
+    const remaining = Math.max(0, this.fuseEnd - performance.now());
+    const frac = this.fuseTotalMs > 0 ? Math.min(1, remaining / this.fuseTotalMs) : 0;
+    this.fuseBar.style.strokeDashoffset = String(FUSE_CIRC * (1 - frac));
+    const color = fuseColor(frac);
+    this.fuseBar.style.stroke = color;
+    this.bombTimeEl.style.color = color;
+    this.bombTimeEl.textContent = remaining > 0 ? String(Math.ceil(remaining / 1000)) : "";
+    this.fuseEl.classList.toggle("is-critical", remaining > 0 && frac <= FUSE_CRITICAL);
+    // Al llegar a 0 se detiene y queda vacio: el server difundira la explosion /
+    // el nuevo turno, que re-ancla la mecha via setFuse.
+    this.fuseRaf = remaining > 0 ? requestAnimationFrame(this.tickFuse) : null;
+  };
 
   /** Actualiza la palabra bajo el avatar de un jugador (tipeo en vivo o aceptada). */
   private setWord(nickname: string, text: string): void {

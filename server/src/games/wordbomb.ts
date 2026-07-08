@@ -42,6 +42,8 @@ class WordBombSim implements RoomSim {
   private turnIdx = 0;
   private fragment: string | null = null;
   private deadline: number | null = null;
+  /** Duracion de la mecha del turno actual (para que el cliente dibuje la fraccion). */
+  private fuseTotal = FUSE_BASE_MS;
   private fuseTimer: ReturnType<typeof setTimeout> | null = null;
   private startTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly used = new Set<string>();
@@ -113,7 +115,8 @@ class WordBombSim implements RoomSim {
 
   private newTurn(): void {
     this.fragment = randomFragment();
-    this.deadline = Date.now() + fuseFor(this.accepted);
+    this.fuseTotal = fuseFor(this.accepted);
+    this.deadline = Date.now() + this.fuseTotal;
     this.armFuse();
     this.broadcastState();
   }
@@ -206,11 +209,14 @@ class WordBombSim implements RoomSim {
   }
 
   private broadcastState(): void {
+    const fuseMs = this.deadline !== null ? Math.max(0, this.deadline - Date.now()) : null;
     const state: WbState = {
       phase: this.phase,
       turn: this.phase === "playing" ? this.current()?.nickname ?? null : null,
       fragment: this.fragment,
       deadline: this.deadline,
+      fuseMs,
+      fuseTotalMs: this.deadline !== null ? this.fuseTotal : null,
       players: this.playerViews(),
       usedCount: this.accepted,
       lastAccepted: this.lastAccepted,

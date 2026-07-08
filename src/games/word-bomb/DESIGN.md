@@ -53,8 +53,13 @@ vistazo, sepas **de quien es el turno y que esta escribiendo**.
   ilustraciones recargadas.
 - **La bomba** es un disco simple con el fragmento; la tension la pone la
   **flecha que apunta** al jugador de turno, no una ilustracion de dinamita.
-  **No se muestra cuanto tiempo queda** (a proposito, da suspenso): la bomba
-  puede explotar en cualquier momento; el server tiene el deadline real.
+- **La mecha es visible para todos, en todos los turnos**: un **anillo alrededor
+  de la bomba** se consume con el tiempo y debajo del fragmento cuenta los
+  **segundos restantes**. Va de **chispa amarilla** (llena) a **rojo peligro**
+  (por vaciarse), con un pulso cuando esta por explotar. Es informacion clave del
+  juego: saber cuanto le queda a la bomba es parte de la decision. El server tiene
+  el deadline real y manda los ms restantes; el cliente los ancla a su reloj local
+  para animar el anillo sin drift entre maquinas.
 - **Texto en vivo** debajo del avatar: lo que se teclea se ve al instante (propio
   y ajeno, via el relay del server). La ultima palabra aceptada queda debajo del
   avatar hasta el proximo turno de ese jugador.

@@ -19,6 +19,11 @@ export interface WbState {
   turn: string | null;
   fragment: string | null;
   deadline: number | null;
+  /** Ms restantes de la mecha al broadcast; se anclan a performance.now() para
+   *  animar el anillo sin drift de reloj. Ver server/src/protocol.ts. */
+  fuseMs: number | null;
+  /** Duracion total de la mecha del turno actual (fraccion del anillo). */
+  fuseTotalMs: number | null;
   players: WbPlayerView[];
   usedCount: number;
   lastAccepted: { player: string; word: string; seq: number } | null;

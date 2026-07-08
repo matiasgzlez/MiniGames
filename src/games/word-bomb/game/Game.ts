@@ -33,6 +33,9 @@ export class Game {
   private latest: WbState | null = null;
   private prev: WbState | null = null;
   private lastAcceptSeq = 0;
+  /** Fallback de la mecha para un server viejo (solo manda `deadline`). */
+  private fuseFallbackDeadline: number | null = null;
+  private fuseFallbackTotal = 0;
   /** Ultima palabra aceptada por cada jugador (se muestra bajo su avatar). */
   private readonly lastWords = new Map<string, string>();
 
@@ -161,11 +164,40 @@ export class Game {
       usedCount: s.usedCount,
     });
 
-    // Sin mecha visible a proposito: el jugador no ve cuanto tiempo le queda (da
-    // suspenso). El server sigue teniendo el deadline real y hace explotar la
-    // bomba; el cliente solo se entera cuando alguien pierde una vida.
+    // Mecha visible: todos ven cuanto le queda a la bomba en cada turno.
+    this.updateFuse(s);
 
     this.prev = s;
+  }
+
+  /**
+   * Alimenta el anillo de la mecha. Prefiere `fuseMs`/`fuseTotalMs` del server
+   * (anclados a performance.now() en la Hud, sin drift de reloj). Si el server es
+   * viejo y no los manda, cae al `deadline` (epoch absoluto) computando el restante
+   * con el reloj local — funciona igual, con un leve drift posible entre maquinas.
+   */
+  private updateFuse(s: WbState): void {
+    if (s.phase !== "playing") {
+      this.hud.clearFuse();
+      this.fuseFallbackDeadline = null;
+      return;
+    }
+    if (s.fuseMs != null && s.fuseTotalMs != null && s.fuseTotalMs > 0) {
+      this.hud.setFuse(s.fuseMs, s.fuseTotalMs);
+      return;
+    }
+    if (s.deadline != null) {
+      const remaining = Math.max(0, s.deadline - Date.now());
+      // El total es el restante observado al aparecer un deadline nuevo (los
+      // snapshots llegan al empezar el turno, asi que es ~la mecha completa).
+      if (s.deadline !== this.fuseFallbackDeadline) {
+        this.fuseFallbackDeadline = s.deadline;
+        this.fuseFallbackTotal = Math.max(remaining, 1);
+      }
+      this.hud.setFuse(remaining, this.fuseFallbackTotal);
+      return;
+    }
+    this.hud.clearFuse();
   }
 
   private playDiffSounds(s: WbState): void {
@@ -205,6 +237,7 @@ export class Game {
     if (this.state === "over") return;
     this.state = "over";
     this.hud.setInputEnabled(false);
+    this.hud.clearFuse();
 
     const me = this.room?.me ?? "";
     const mine = result.ranking.find((r) => r.nickname === me);

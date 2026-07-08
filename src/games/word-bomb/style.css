@@ -131,6 +131,62 @@ body {
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
 }
 
+/* Segundos restantes de la mecha, bajo el fragmento (color lo pone el JS: de
+   chispa a rojo segun cuanto queda). */
+.wb__bomb-time {
+  min-height: 1em;
+  margin-top: 3px;
+  font-size: clamp(0.75rem, 2.4vmin, 1.05rem);
+  font-weight: 800;
+  line-height: 1;
+  color: var(--spark);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+}
+
+/* Anillo de la mecha alrededor de la bomba: se consume con el tiempo. Empieza
+   arriba (rotado -90) y todos los jugadores lo ven en cada turno. */
+.wb__fuse {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) rotate(-90deg);
+  width: clamp(122px, 27vmin, 190px);
+  height: clamp(122px, 27vmin, 190px);
+  z-index: 3;
+  pointer-events: none;
+  overflow: visible;
+}
+.wb__fuse[hidden] {
+  display: none;
+}
+.wb__fuse-track {
+  fill: none;
+  stroke: rgba(0, 0, 0, 0.38);
+  stroke-width: 3.5;
+}
+.wb__fuse-bar {
+  fill: none;
+  stroke: var(--spark);
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  /* stroke-dasharray / -dashoffset / stroke los setea el JS por frame. */
+  transition: stroke 180ms linear;
+}
+.wb__fuse.is-critical .wb__fuse-bar {
+  animation: wb-fuse-pulse 0.5s ease-in-out infinite;
+}
+
+@keyframes wb-fuse-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
 /* Flecha/chispa que apunta al jugador de turno (gira segun el angulo). */
 .wb__pointer {
   position: absolute;

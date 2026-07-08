@@ -28,6 +28,12 @@ export interface WbState {
   fragment: string | null;
   /** Fin de la mecha en epoch ms (el cliente lo anima), o null. */
   deadline: number | null;
+  /** Ms restantes de la mecha al momento del broadcast. El cliente los ancla a su
+   *  reloj monotono local (performance.now()) para animar el anillo sin depender
+   *  del epoch del server (evita el drift de reloj entre maquinas). */
+  fuseMs: number | null;
+  /** Duracion total de la mecha de este turno, para la fraccion del anillo. */
+  fuseTotalMs: number | null;
   players: WbPlayerView[];
   /** Palabras aceptadas en la partida (para mostrar el ritmo). */
   usedCount: number;
