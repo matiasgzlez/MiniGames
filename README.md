@@ -54,6 +54,7 @@ Hecho con **Vite + TypeScript** (sin framework) y desplegado como sitio estátic
 | Final Sentence | Reflejos | Despertás con un revólver en la sien: escribí cada frase sin fallar porque cada error carga una bala en el tambor. Al terminar la frase se jala el gatillo, una ruleta rusa. Sobreviví y sumá frases. | [Facu-Basualdo](https://github.com/Facu-Basualdo) |
 | Pulso de Acero | Precisión | Una mano sostiene una katana en un dojo a oscuras: mantené el filo en equilibrio (péndulo invertido) inclinando izquierda y derecha, y aguantá lo máximo posible antes de que se caiga. Tu marca es el tiempo que la mantenés parada. | [matiasgzlez](https://github.com/matiasgzlez) |
 | Memoria de Color | Precisión | Un color aparece unos segundos y desaparece: recreálo de memoria moviendo los deslizadores de matiz, saturación y brillo. Tres rondas y tu puntaje es el promedio de aciertos. Descubrí qué tan fiable es tu ojo. | [matiasgzlez](https://github.com/matiasgzlez) |
+| Hole in None | Precisión | Tres hoyos de minigolf cartoon en 3D con molinetes, bumpers y atajos arriesgados. Arrastrá desde la pelota para apuntar, soltá para pegar y embocá en la menor cantidad de golpes. | [emi1i0](https://github.com/emi1i0) |
 
 ## Empezar
 
