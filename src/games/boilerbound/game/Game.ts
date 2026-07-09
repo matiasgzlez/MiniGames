@@ -180,7 +180,7 @@ export class Game {
     SoundEffects.playDeath();
 
     const px = this.player.x;
-    const py = this.player.y + 0.7;
+    const py = this.player.visualY + 0.7;
     this.particles.burst(px, py, 24, { speed: 8, up: 3, gravity: 20, color: new THREE.Color(0xffffff) });
     this.particles.burst(px, py, 16, { speed: 6, up: 2, gravity: 22, color: new THREE.Color(WARNING_COLOR) });
     this.emergencyLight.position.set(px, py, 3);
@@ -225,10 +225,9 @@ export class Game {
         dashPressed: this.input.consumeDashPressed(),
       });
       if (events.jumped) SoundEffects.playJump();
-      if (events.wallJumped) SoundEffects.playWallJump();
       if (events.dashed) {
         SoundEffects.playDash();
-        this.particles.burst(this.player.x, this.player.y + 0.5, 8, {
+        this.particles.burst(this.player.x, this.player.visualY + 0.5, 8, {
           speed: 4,
           gravity: 8,
           color: new THREE.Color(0x2ad6ff),
@@ -241,7 +240,7 @@ export class Game {
         this.hud.flashBanner("¡SOBRECARGA!");
       }
 
-      if (!this.player.invulnerable && this.field.isPlayerHit(this.player.x, this.player.halfWidth, this.player.y)) {
+      if (!this.player.invulnerable && this.field.isPlayerHit(this.player.x, this.player.hurtHalfWidth, this.player.y)) {
         this.endGame();
       }
 
